@@ -198,13 +198,15 @@ test('steel cold weapons replace earlier gear and cannon benefits require ammuni
   state.army.artillery=0;assert.equal(getCombatRating(state).equipment,getCombatRating(state).baseEquipment);
 });
 
-test('combat multiplies industrial quantity, equipment and training; both fronts must pass',()=>{
-  const state=coldForce();assert.ok(getCombatRating(state).ready);
-  assert.equal(state.projects.minie_rifle.completed,false);assert.equal(state.projects.napoleon_gun.completed,false);
-  Object.assign(state.army,{infantry:0,drill:0,coordination:0});assert.ok(getCombatRating(state).fronts.every(f=>f.score===0));
-  Object.assign(state.army,{infantry:65,drill:65,coordination:65});const rating=getCombatRating(state);
-  assert.equal(rating.fronts[0].done,true);assert.equal(rating.fronts[1].done,false);assert.equal(rating.ready,false);
-  assert.equal(getGoals(state).filter(g=>g.done).length,1);
+test('industrial output increases recurring replacements while equipment and training remain independent',()=>{
+  const state=coldForce(),rating=getCombatRating(state);
+  assert.equal(rating.reinforcements,rating.quantity*10);
+  assert.ok(rating.reinforcements>getCombatRating(createGame()).reinforcements);
+  assert.equal(state.projects.minie_rifle.completed,false);
+  assert.equal(rating.fronts.length,0,'unrevealed fronts stay out of combat reports');
+  Object.assign(state.army,{infantry:0,drill:0,coordination:0});
+  assert.equal(getCombatRating(state).training,0);
+  assert.equal(getCombatRating(state).reinforcements,rating.reinforcements);
 });
 
 test('trials allow one paid rescue and round-tripped saves reproduce its outcome',()=>{
@@ -216,43 +218,42 @@ test('trials allow one paid rescue and round-tripped saves reproduce its outcome
   assert.ok(performAction(result,{type:'rescue',accept:true}).error);assert.ok(performAction(result,{type:'test',id:'survey'}).error);
 });
 
-test('crises award prestige and never move the fixed deadline',()=>{
-  let state=createGame();complete(state,'bloomery','civil_works');
+test('new campaigns replace scripted crisis choices with persistent fronts',()=>{
+  let state=createGame();
+  assert.deepEqual(state.plannedEvents,[]);
   while(state.turn<6)state=finishSeason(state);
-  state=act(state,{type:'endTurn'});const cost=state.pending.choices.find(c=>c.id==='supply').cost;
-  const money=state.money,reputation=state.reputation;state=act(state,{type:'event',choice:'supply'});
-  assert.equal(state.reputation,reputation+11);assert.equal(state.money,money-cost+getSummary(state).income);
-  assert.equal(state.turn,7);assert.equal(state.maxTurns,24);
+  assert.deepEqual(getCombatRating(state).fronts.map(front=>front.id),['wokou']);
+  const money=state.money,reputation=state.reputation;
+  state=act(state,{type:'endTurn'});
+  assert.equal(state.pending,null);assert.equal(state.turn,7);
+  assert.equal(state.reputation,reputation);
+  assert.equal(state.money,money+getSummary(state).income);
+  assert.equal(state.maxTurns,24);
 });
 
-test('automatic victory has no mandatory gun model or further deployment stage',()=>{
+test('a fully equipped and trained army never wins before the final seasonal battle',()=>{
   let state=coldForce();const info=getProjectInfo(state,'joint_trials');
-  assert.equal(info.canTest,false);assert.equal(info.canInvest,false);assert.equal(info.missing.length,0);
-  state.turn=24;state=act(state,{type:'selectDoctrine',id:'cold'});
-  assert.equal(state.status,'won');assert.equal(state.turn,24);assert.equal(state.projects.joint_trials.completed,true);assert.equal(state.projects.joint_trials.attempts,0);
+  assert.equal(info.canTest,false);assert.equal(info.canInvest,false);
+  state=act(state,{type:'selectDoctrine',id:'cold'});
+  assert.equal(state.status,'playing');assert.equal(state.turn,1);
+  assert.equal(state.projects.joint_trials.completed,false);
+  assert.equal(state.projects.joint_trials.attempts,0);
 });
 
-test('calendar and scaled crises cover 24, 40 and 64 seasons and all tech without training still loses',()=>{
+test('calendar covers 24, 40 and 64 seasons with a fixed final date',()=>{
   for(const [maxTurns,date] of [[24,'崇祯十一年·夏季'],[40,'崇祯七年·夏季'],[64,'崇祯元年·夏季']]){
-    let state=createGame({maxTurns});assert.equal(getDate(state),date);
-    assert.deepEqual(state.plannedEvents.map(e=>e.turn),[maxTurns/4,maxTurns/2,maxTurns*3/4]);
+    const state=createGame({maxTurns});assert.equal(getDate(state),date);
     state.turn=maxTurns;assert.equal(getDate(state),'崇祯十七年·春季');
-    for(const p of PROJECTS)if(!p.automatic)complete(state,p.id);
-    state=act(state,{type:'endTurn'});assert.equal(state.status,'lost');assert.equal(state.projects.joint_trials.completed,false);
-    assert.ok(performAction(state,{type:'endTurn'}).error);
   }
 });
 
-for(const doctrine of DOCTRINES.map(d=>d.id))test(`natural ${doctrine} campaign wins through financed public actions within 24 seasons`,()=>{
-  const {state}=playCampaign(doctrine);assert.equal(state.status,'won',JSON.stringify(getCombatRating(state)));
-  assert.ok(state.turn<=24);assert.ok(getGoals(state).every(g=>g.done));assert.equal(state.projects.joint_trials.attempts,0);
-});
-
-for(const id of ['minie_rifle','minie_ammo'])test(`the last ${id} completed in season 24 wins immediately, with no post-completion operation`,()=>{
-  const {state,beforeDeferredTest}=playCampaign('minie',{deferProject:id,deferUntil:24});
-  assert.ok(beforeDeferredTest);assert.equal(beforeDeferredTest.projects[id].completed,false);
-  assert.equal(beforeDeferredTest.status,'playing');assert.equal(getCombatRating(beforeDeferredTest).ready,false);
-  assert.equal(state.status,'won');assert.equal(state.turn,24);assert.equal(state.projects.joint_trials.attempts,0);
+for(const doctrine of DOCTRINES.map(d=>d.id))test(`financed ${doctrine} research without deploying an army cannot win`,()=>{
+  const {state}=playCampaign(doctrine);
+  assert.equal(state.status,'lost');assert.ok(state.turn<=24);
+  assert.equal(state.projects.joint_trials.completed,false);
+  assert.equal(state.projects.joint_trials.attempts,0);
+  assert.ok(Object.values(state.warfare.fronts).every(front=>front.assigned===0));
+  assert.ok(performAction(state,{type:'endTurn'}).error);
 });
 
 
@@ -413,27 +414,21 @@ test('court rescue failure can trigger the red-pill ending while a successful re
   assert.equal(rescued.status,'playing');assert.equal(rescued.reputation,getTrialStakes(state,'survey',true).prestigeGain);
 });
 
-test('zero prestige is safe after a trial, dismissal or ignored crisis',()=>{
+test('zero prestige is safe after a trial, dismissal and seasonal settlement',()=>{
   let trial=workshopGame();trial.projects.survey.progress=60;trial.rng=rollSeed(95,100);
   trial.reputation=getTrialStakes(trial,'survey').prestigeLoss;
   trial=act(trial,{type:'test',id:'survey'});assert.equal(trial.reputation,0);assert.equal(trial.status,'playing');
   let dismissal=createGame();dismissal.reputation=5;
   dismissal=act(dismissal,{type:'dismissTeam',teamId:dismissal.teams[0].id});assert.equal(dismissal.reputation,0);assert.equal(dismissal.status,'playing');
-  let crisis=createGame();crisis.turn=crisis.plannedEvents[0].turn;crisis.reputation=3;
-  crisis=act(crisis,{type:'endTurn'});const money=crisis.money,turn=crisis.turn;
-  crisis=act(crisis,{type:'event',choice:'ignore'});
-  assert.equal(crisis.reputation,0);assert.equal(crisis.status,'playing');assert.equal(crisis.turn,turn+1);assert.equal(crisis.money,money+6000);
+  const money=dismissal.money;dismissal=act(dismissal,{type:'endTurn'});
+  assert.equal(dismissal.reputation,0);assert.equal(dismissal.status,'playing');assert.equal(dismissal.money,money+6000);
 });
 
-test('dismissal and ignored crises can cause immediate prestige defeat before victory or seasonal income',()=>{
-  const army=coldForce();army.reputation=4;assert.equal(getCombatRating(army).ready,true);
+test('dismissal can cause immediate prestige defeat before seasonal income',()=>{
+  const army=coldForce();army.reputation=4;
   const dismissed=act(army,{type:'dismissTeam',teamId:army.teams[0].id});
   assert.equal(dismissed.reputation,-1);assert.equal(dismissed.status,'lost');assert.equal(dismissed.defeatReason,'prestige');
   assert.equal(dismissed.projects.joint_trials.completed,false);assert.equal(dismissed.turn,army.turn);
-  let crisis=createGame();crisis.turn=crisis.plannedEvents[0].turn;crisis.reputation=2;
-  crisis=act(crisis,{type:'endTurn'});const money=crisis.money,earned=crisis.stats.earned,turn=crisis.turn,eventId=crisis.pending.id;
-  crisis=act(crisis,{type:'event',choice:'ignore'});
-  assert.equal(crisis.reputation,-1);assert.equal(crisis.status,'lost');assert.equal(crisis.defeatReason,'prestige');
-  assert.equal(crisis.pending,null);assert.equal(crisis.turn,turn);assert.equal(crisis.money,money);assert.equal(crisis.stats.earned,earned);
-  assert.ok(crisis.resolvedEvents.includes(eventId));assert.equal(crisis.log[0].title,'群臣进献红丸');
+  assert.equal(dismissed.money,army.money);assert.equal(dismissed.stats.earned,army.stats.earned);
+  assert.equal(dismissed.log[0].title,'群臣进献红丸');
 });

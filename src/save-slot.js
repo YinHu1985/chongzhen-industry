@@ -1,5 +1,6 @@
 import { parseSave } from './storage.js';
 
+// Keep the original browser slot so installed v4 campaigns migrate on first read.
 export const SAVE_KEY = 'chongzhen-industry.save.v4';
 export const MAX_SAVE_FILE_BYTES = 2 * 1024 * 1024;
 

@@ -46,3 +46,17 @@ test('invalid, empty and oversized imports are rejected without reading oversize
   await assert.rejects(readSaveFile(new Blob(['not json'])), /JSON/);
   await assert.rejects(readSaveFile(new Blob(['{}'])), /不兼容|不完整/);
 });
+
+test('an existing browser slot migrates v4 in memory without overwriting the source', () => {
+  const legacy = createGame({ seed: 812 });
+  legacy.version = 4; delete legacy.enemyStrength; delete legacy.warfare;
+  legacy.plannedEvents = [1, 2, 3].map(stage => ({ id: `crisis_${stage}`, stage,
+    turn: stage * 6, title: '旧军报', description: '地方请求援军。' }));
+  const raw = JSON.stringify({ state: legacy });
+  const existing = slot(raw), restored = loadLocalSave(existing);
+  assert.equal(restored.version, 5); assert.equal(restored.status, 'playing');
+  assert.deepEqual(restored.projects, legacy.projects);
+  assert.equal(existing.raw, raw); assert.equal(existing.writes, 0);
+  storeLocalSave(existing, restored);
+  assert.deepEqual(loadLocalSave(existing), restored); assert.equal(existing.writes, 1);
+});

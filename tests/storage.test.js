@@ -2,13 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, performAction, getProjectInfo, getCombatRating, getTeamActivity, PROJECTS, FACILITIES } from '../src/game.js';
 import { isValidState, parseSave } from '../src/storage.js';
+import { createWarfare } from '../src/warfare.js';
 
 const ROOT_PROJECT = PROJECTS.find(project => !project.prerequisites.length
   && !project.prerequisiteAny?.length && !project.milestoneRequirements?.length
   && project.category !== 'army');
 
+function toLegacy(current) {
+  const state = structuredClone(current);
+  state.version = 4; delete state.enemyStrength; delete state.warfare;
+  state.plannedEvents = [1, 2, 3].map(stage => ({ id: `crisis_${stage}`, stage,
+    turn: Math.round(state.maxTurns * stage / 4), title: '旧军报', description: '地方请求援守。' }));
+  state.resolvedEvents = state.plannedEvents.filter(event => event.turn < state.turn).map(event => event.id);
+  return state;
+}
+function legacyState(turn = 1) {
+  const state = createGame(); state.turn = turn;
+  return toLegacy(state);
+}
+
 function roundTrip(state) {
-  assert.equal(isValidState(state), true, `valid v4 state rejected at turn ${state.turn}`);
+  assert.equal(isValidState(state), true, `valid v5 state rejected at turn ${state.turn}`);
   assert.deepEqual(parseSave(JSON.stringify(state)), state);
   assert.deepEqual(parseSave(JSON.stringify({ state, savedAt: '2026-11-01T00:00:00.000Z' })), state);
   return state;
@@ -38,10 +52,10 @@ function rescueFixture(inviteCourt = false) {
   throw new Error('No recoverable trial found');
 }
 
-test('v4 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
+test('v5 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
   for (const maxTurns of [24, 40, 64]) for (const doctrine of ['cold', 'cuirassier', 'minie', 'breech']) {
     let state = roundTrip(createGame({ maxTurns, seed: 12345 }));
-    assert.equal(state.version, 4);
+    assert.equal(state.version, 5);
     assert.equal(state.teams.length, 5);
     assert.equal(state.candidates.length, 3);
     assert.ok(!Object.hasOwn(state, 'routes') && !Object.hasOwn(state, 'usedTeams'));
@@ -121,38 +135,38 @@ test('zero prestige and immediate red-pill endings survive reload and remain ter
   }
 });
 
-test('red-pill defeat can retain a crisis resolved in the same quarter without advancing time', () => {
-  let state = createGame();
-  for (let dismissal = 0; dismissal < 2; dismissal += 1) {
-    state = act(state, { type: 'dismissTeam', teamId: state.teams.at(-1).id });
-  }
-  while (!state.pending) state = act(state, { type: 'endTurn' });
-  const eventId = state.pending.id;
-  const lost = act(state, { type: 'event', choice: 'ignore' });
-  assert.equal(lost.status, 'lost');
-  assert.equal(lost.defeatReason, 'prestige');
-  assert.equal(lost.turn, state.turn);
-  assert.equal(lost.money, state.money);
-  assert.equal(lost.pending, null);
-  assert.ok(lost.resolvedEvents.includes(eventId));
+test('legacy pending crises migrate without spending funds or prestige or advancing time', () => {
+  const old = legacyState(6);
+  old.pending = { kind: 'event', ...old.plannedEvents[0], choices: [
+    { id: 'supply', label: '军需', description: '供军', cost: 3500, disabled: true },
+    { id: 'dispatch', label: '援军', description: '援守', cost: 2800, disabled: true, successChance: 25 },
+    { id: 'ignore', label: '暂缓', description: '待议', cost: 0, disabled: false },
+  ] };
+  const migrated = parseSave(JSON.stringify(old));
+  assert.equal(migrated.version, 5); assert.equal(migrated.turn, 6);
+  assert.equal(migrated.money, old.money); assert.equal(migrated.reputation, old.reputation);
+  assert.equal(migrated.pending, null); assert.deepEqual(migrated.plannedEvents, []);
+  assert.deepEqual(migrated.resolvedEvents, []); assert.equal(migrated.warfare.fronts.wokou.troops > 0, true);
+  assert.equal(migrated.warfare.fronts.li.troops, 0); roundTrip(migrated);
 });
 
-test('existing v4 method choices are discarded on load without losing research or team progress', () => {
+test('v4 research methods migrate without losing research or team progress', () => {
   let state = act(createGame({ seed: 1 }), { type: 'build', id: 'workshop' });
   state = act(state, { type: 'invest', id: 'standards', teamId: state.teams[0].id });
-  const oldSave = structuredClone(state);
+  const oldSave = toLegacy(state);
   for (const project of Object.values(oldSave.projects)) project.method = 'standard';
   oldSave.projects.standards.method = 'makeshift';
   const restored = parseSave(JSON.stringify({ state: oldSave }));
-  assert.deepEqual(restored, state);
+  assert.deepEqual(restored.projects, state.projects);
+  assert.deepEqual(restored.teams, state.teams);
   assert.ok(Object.values(restored.projects).every(project => !Object.hasOwn(project, 'method')));
   assert.deepEqual(getTeamActivity(restored, state.teams[0].id), getTeamActivity(state, state.teams[0].id));
-  assert.deepEqual(act(restored, { type: 'endTurn' }), act(state, { type: 'endTurn' }));
+  roundTrip(restored);
   const badSave = structuredClone(oldSave); badSave.projects.standards.method = 'unknown';
   assert.throws(() => parseSave(JSON.stringify(badSave)));
 });
 
-test('military news, resolved events and final defeat reload across every campaign length', () => {
+test('growing warfronts and threshold defeats reload across every campaign length', () => {
   for (const maxTurns of [24, 40, 64]) {
     let state = roundTrip(createGame({ maxTurns }));
     while (state.status === 'playing') {
@@ -164,18 +178,15 @@ test('military news, resolved events and final defeat reload across every campai
   }
 });
 
-test('all four natural doctrines restore intermediate actions, combat ratings and immediate victories', async () => {
+test('all four natural doctrines restore intermediate actions, deployments and final results', async () => {
   const { playCampaign } = await import('./helpers/campaign.mjs');
   for (const doctrine of ['cold', 'cuirassier', 'minie', 'breech']) {
     const { state } = playCampaign(doctrine, { seed: 12345, maxTurns: 24, onAction: roundTrip });
-    assert.equal(state.status, 'won', doctrine);
-    assert.equal(state.projects.joint_trials.completed, true);
+    assert.notEqual(state.status, 'playing', doctrine);
     const restored = roundTrip(state);
     assert.deepEqual(getCombatRating(restored), getCombatRating(state));
-    assert.ok(getCombatRating(restored).fronts.every(front => front.done));
     const result = performAction(restored, { type: 'endTurn' });
-    assert.ok(result.error);
-    assert.equal(result.state, restored);
+    assert.ok(result.error); assert.equal(result.state, restored);
   }
 });
 
@@ -254,7 +265,7 @@ test('invalid numbers, project metadata, forged scores and impossible endings ar
     state => { state.status = 'lost'; },
     state => { state.status = 'won'; state.projects.joint_trials.completed = true; state.projects.joint_trials.progress = 100; },
     state => { state.resolvedEvents = ['unknown']; },
-    state => { state.plannedEvents[0].turn += 1; },
+    state => { state.plannedEvents.push({ id: 'crisis_1', turn: 6 }); },
     state => { state.log[0].id = state.nextLogId; },
     state => { state.log.push(structuredClone(state.log[0])); },
     state => { state.stats.spent = -1; },
@@ -269,23 +280,19 @@ test('invalid numbers, project metadata, forged scores and impossible endings ar
   }
 });
 
-test('pending decisions cannot reference unrelated projects or invent extra event choices', () => {
+test('pending decisions cannot reference unrelated projects or resurrect old event choices', () => {
   const rescue = rescueFixture();
   for (const change of [pending => { pending.projectId = 'joint_trials'; }, pending => { pending.projectId = 'unknown'; }, pending => { pending.cost = -100; }, pending => { pending.successChance = 96; }, pending => { pending.inviteCourt = 'yes'; }, pending => { pending.inviteCourt = null; }, pending => { pending.inviteCourt = 1; }]) {
     const state = structuredClone(rescue); change(state.pending);
     assert.equal(isValidState(state), false);
   }
-  let event = createGame();
-  while (!event.pending) event = performAction(event, { type: 'endTurn' }).state;
-  roundTrip(event);
-  const duplicate = structuredClone(event); duplicate.pending.choices[1] = structuredClone(duplicate.pending.choices[0]);
-  assert.equal(isValidState(duplicate), false);
-  const unrelated = structuredClone(event); unrelated.pending.id = 'unknown';
-  assert.equal(isValidState(unrelated), false);
+  const state = createGame();
+  state.pending = { kind: 'event', id: 'crisis_1', title: '旧军报', description: '旧军报', choices: [] };
+  assert.equal(isValidState(state), false);
 });
 
-test('only v4 JSON is accepted; malformed and oversized imports fail without migration', () => {
-  for (const version of [1, 2, 3, 5]) {
+test('unsupported versions and malformed or oversized imports are rejected', () => {
+  for (const version of [1, 2, 3, 6]) {
     const state = createGame(); state.version = version;
     const before = structuredClone(state);
     assert.equal(isValidState(state), false);
@@ -298,7 +305,7 @@ test('only v4 JSON is accepted; malformed and oversized imports fail without mig
 });
 
 
-test('optional team activities preserve existing v4 saves without migration or fabricated assignments',()=>{
+test('optional team activities preserve saves without fabricated assignments',()=>{
   let state=act(createGame(),{type:'build',id:'workshop'});
   const teamId=state.teams.find(team=>team.usedTurn!==state.turn).id;
   state=act(state,{type:'invest',id:ROOT_PROJECT.id,teamId});
@@ -355,4 +362,129 @@ test('malformed or duplicated team activity and candidate assignments are reject
     assert.equal(isValidState(state),false,mutate.toString());
     assert.throws(()=>parseSave(JSON.stringify(state)));
   }
+});
+
+test('deployed armies, automatic targets, enemy caps and battle reports round-trip', () => {
+  let state = createGame({ enemyStrength: 7 });
+  while (state.turn < 6) state = act(state, { type: 'endTurn' });
+  state = act(state, { type: 'configureFront', id: 'wokou', target: 5000, battleCap: 2500 });
+  const before = roundTrip(state), restored = parseSave(JSON.stringify(before));
+  state = act(state, { type: 'endTurn' });
+  assert.deepEqual(state, act(restored, { type: 'endTurn' }));
+  assert.equal(state.enemyStrength, 7);
+  assert.equal(state.warfare.fronts.wokou.target, 5000);
+  assert.equal(state.warfare.fronts.wokou.battleCap, 2500);
+  assert.equal(state.warfare.fronts.wokou.lastBattle.turn, 6);
+});
+
+test('invalid difficulty, dormant deployments, enemy bounds and malformed battle reports are rejected', () => {
+  const mutations = [
+    state => { state.enemyStrength = 0; }, state => { state.enemyStrength = 11; },
+    state => { state.enemyStrength = 1.5; }, state => { state.enemyStrength = '3'; },
+    state => { state.warfare.reserve = -1; }, state => { state.warfare.reserve = Infinity; },
+    state => { state.warfare.lastSettledTurn = state.turn + 1; },
+    state => { state.warfare.fronts.wokou.target = 2000; },
+    state => { state.warfare.fronts.wokou.troops = 100; },
+    state => { state.warfare.fronts.wokou.battleCap = 0; },
+    state => { state.warfare.fronts.wokou.battleCap = 1.5; },
+    state => { state.warfare.fronts.wokou.extra = 100; },
+    state => { delete state.warfare.fronts.qing; },
+  ];
+  for (const mutate of mutations) {
+    const state = createGame(); mutate(state);
+    assert.equal(isValidState(state), false, mutate.toString());
+    assert.throws(() => parseSave(JSON.stringify(state)));
+  }
+  let fought = createGame();
+  while (fought.turn < 7) fought = act(fought, { type: 'endTurn' });
+  for (const mutate of [
+    battle => { battle.enemyLosses = battle.enemyCommitted + 1; },
+    battle => { battle.playerLosses = battle.playerCommitted + 1; },
+    battle => { battle.enemyAfter += 1; }, battle => { battle.turn = 24; },
+    battle => { battle.reinforcements = -1; }, battle => { battle.sustainable = 'true'; },
+    battle => { battle.extra = 1; }, battle => { delete battle.replacementCapacity; },
+  ]) {
+    const state = structuredClone(fought); mutate(state.warfare.fronts.wokou.lastBattle);
+    assert.equal(isValidState(state), false, mutate.toString());
+  }
+});
+
+test('legacy completed campaigns retain their original endings without reopening play', () => {
+  for (const status of ['won', 'lost']) {
+    const old = legacyState(status === 'won' ? 20 : 24);
+    old.status = status;
+    if (status === 'won') {
+      for (const project of Object.values(old.projects)) {
+        project.completed = true; project.progress = 100; project.attempts = 1;
+      }
+      old.projects.joint_trials.attempts = 0;
+      Object.keys(old.army).forEach(branch => { old.army[branch] = 100; });
+    }
+    const restored = parseSave(JSON.stringify({ state: old }));
+    assert.equal(restored.status, status); assert.equal(restored.legacyEnding, status);
+    assert.deepEqual(restored.projects, old.projects); assert.deepEqual(restored.army, old.army);
+    roundTrip(restored);
+    assert.ok(performAction(restored, { type: 'endTurn' }).error);
+  }
+});
+
+test('invalid legacy saves are rejected before migration and rescue decisions remain pending', () => {
+  const malformed = legacyState(); malformed.teams[0].specialties.math = 500;
+  assert.throws(() => parseSave(JSON.stringify(malformed)));
+  const forged = legacyState(); forged.status = 'won'; forged.projects.joint_trials.completed = true;
+  forged.projects.joint_trials.progress = 100;
+  assert.throws(() => parseSave(JSON.stringify(forged)));
+  const pending = rescueFixture(true), old = toLegacy(pending);
+  const restored = parseSave(JSON.stringify(old));
+  assert.deepEqual(restored.pending, pending.pending);
+  assert.equal(restored.rng, pending.rng); assert.equal(restored.money, pending.money);
+  assert.deepEqual(act(restored, { type: 'rescue', accept: true }).projects,
+    act(pending, { type: 'rescue', accept: true }).projects);
+});
+
+test('final victory, stalemate and each front-specific ending remain valid after reloading', () => {
+  for (const ending of ['won', 'stalemate', 'li', 'qing', 'wokou']) {
+    let state = createGame({ enemyStrength: 3 });
+    state.turn = state.maxTurns;
+    state.warfare = createWarfare(state.maxTurns, state.turn);
+    state.warfare.reserve = 300000;
+    for (const project of PROJECTS.filter(project => !project.automatic)) {
+      Object.assign(state.projects[project.id], { completed: true, progress: 100, attempts: 1 });
+    }
+    Object.keys(state.army).forEach(branch => { state.army[branch] = 100; });
+    if (ending === 'stalemate') Object.values(state.warfare.fronts).forEach(front => { front.troops *= 2; });
+    for (const [id, front] of Object.entries(state.warfare.fronts)) {
+      if (ending !== id) state = act(state, { type: 'configureFront', id, target: 60000, battleCap: front.battleCap });
+    }
+    state = act(state, { type: 'endTurn' });
+    assert.equal(state.status, ['won', 'stalemate'].includes(ending) ? ending : 'lost');
+    if (state.status === 'lost') assert.equal(state.defeatReason, ending);
+    const restored = roundTrip(state);
+    assert.deepEqual(restored.warfare, state.warfare);
+    const corrupted = structuredClone(state);
+    corrupted.status = state.status === 'stalemate' ? 'lost' : 'stalemate';
+    assert.equal(isValidState(corrupted), false);
+  }
+});
+
+test('a pacified front below its victory line does not invalidate a saved stalemate', () => {
+  let state = createGame({ enemyStrength: 3 });
+  state.turn = state.maxTurns;
+  state.warfare = createWarfare(state.maxTurns, state.turn);
+  state.warfare.reserve = 200000;
+  state.warfare.fronts.li.troops = 3000;
+  state.warfare.fronts.qing.troops = 36000;
+  for (const project of PROJECTS.filter(project => !project.automatic)) {
+    Object.assign(state.projects[project.id], { completed: true, progress: 100, attempts: 1 });
+  }
+  Object.keys(state.army).forEach(branch => { state.army[branch] = 100; });
+  for (const id of ['wokou', 'qing']) {
+    state = act(state, { type: 'configureFront', id, target: 60000, battleCap: state.warfare.fronts[id].battleCap });
+  }
+  state = act(state, { type: 'endTurn' });
+  assert.equal(state.status, 'stalemate');
+  assert.equal(state.warfare.fronts.li.lastBattle.sustainable, false);
+  assert.equal(state.warfare.fronts.li.lastBattle.enemyDeclining, false);
+  assert.ok(state.warfare.fronts.li.troops <= 8000);
+  roundTrip(state);
 });

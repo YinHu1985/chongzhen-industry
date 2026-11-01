@@ -26,7 +26,7 @@ const PLANS = {
 
 // Finance every building, research attempt, trial and training session through
 // public actions. No completed technologies, funds, teams or progress are injected.
-export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,deferProject=null,deferUntil=0}={}) {
+export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,deployFronts=null,deferProject=null,deferUntil=0}={}) {
   let state=createGame({seed,maxTurns}), beforeDeferredTest=null;
   const history=[], priorities=PLANS[doctrine];
   if (!priorities) throw new Error(`Unknown campaign ${doctrine}`);
@@ -68,6 +68,9 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,d
       if(!changed)break;
     }
     if(!saving)while(state.status==='playing'&&trainOne()) { /* use idle teams */ }
+    if(state.status==='playing'&&deployFronts) {
+      for(const action of deployFronts(state)) take(action);
+    }
     if(state.status==='playing') {
       take({type:'endTurn'});
       if(state.pending?.kind==='event')take({type:'event',choice:state.pending.choices.find(c=>c.id==='supply'&&!c.disabled)?.id||'ignore'});

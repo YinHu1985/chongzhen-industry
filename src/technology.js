@@ -349,7 +349,7 @@ const CATALOG = [
   project('joint_trials', '新军守京', 'army', 8, ['mass_production', 'logistics', 'officer_school'], {
     layoutPrerequisites: ['minie_rifle', 'minie_ammo', 'napoleon_gun', 'artillery_supply', 'armstrong_gun', 'rifled_shells', 'breech_rifle', 'metal_cartridges'],
     description: '都城防御依赖部队、工事、军械和补给协同，须兼顾城防与外围行动。',
-    benefits: '两条战线评分达标即自动胜利，无需另行投入或验收。', tags: ['自动达成', '最终胜利', '两线守京'],
+    benefits: '最后一季结算后，三条战线敌军均压至平定线以下，自动达成胜利。', tags: ['终局结算', '最终胜利', '三线平定'],
     automatic: true, cost: 0, testCost: 0, prestige: 0, minimum: 0, work: 1,
     technical: '兵力数量不能代替指挥和训练，精良军械也依赖稳定补给；守军需要维持纪律、预备力量与各部通信。',
     historical: '明代军事著作已把练兵、治械和阵法联系讨论。城防长期涉及军事组织、工程设施与物资储备的共同运作。', source: SOURCES.qijiguang,
@@ -357,13 +357,13 @@ const CATALOG = [
 ];
 
 export const TECH_CATEGORIES = [
-  {id:'industry',name:'工业',description:'扩充供军数量，同类工艺只取最高贡献。',color:'#8f7544'},
+  {id:'industry',name:'工业',description:'扩充每季补员，同类工艺只取最高贡献。',color:'#8f7544'},
   {id:'arms',name:'军械',description:'武器与弹药成套发挥效力，按军队方略选用。',color:'#936146'},
   {id:'army',name:'军制',description:'建立操典、军官与后勤，释放训练潜力。',color:'#617549'},
 ];
 export const SPECIALTIES = [{id:'math',name:'数学'},{id:'metallurgy',name:'冶金'},{id:'mechanics',name:'机械'},{id:'foreign',name:'洋务'},{id:'military',name:'军事'},{id:'management',name:'管理'}];
 export const DOCTRINES = [
-  {id:'cold',name:'冷兵器大军',description:'以充足的铁器、甲具和工业供给武装大军，靠数量与纪律抵挡两路强敌。',branch:'infantry',quantityFactor:3.2,frontModifiers:{li:1.12,qing:1},equipmentFamily:'cold_equipment'},
+  {id:'cold',name:'冷兵器大军',description:'以充足的铁器、甲具和工业供给武装大军，靠持续补员与纪律维持各线战事。',branch:'infantry',quantityFactor:3.2,frontModifiers:{li:1.12,qing:1},equipmentFamily:'cold_equipment'},
   {id:'cuirassier',name:'胸甲骑兵',description:'集中精良甲具与训练，组建冲击力强的骑兵军团。',branch:'cavalry',quantityFactor:1.45,frontModifiers:{li:1.1,qing:1.18},equipmentFamily:'cavalry'},
   {id:'minie',name:'精锐火枪军',description:'缩小军队规模，以成套火枪弹药和严格操练提高战斗效能。',branch:'infantry',quantityFactor:1.05,frontModifiers:{li:1.15,qing:1.25},equipmentFamily:'firearms'},
   {id:'breech',name:'后装精兵',description:'进一步集中供给与训练，适合高效后装火器，亦可暂用较早制式。',branch:'infantry',quantityFactor:.9,frontModifiers:{li:1.35,qing:1.5},equipmentFamily:'firearms'},
@@ -415,8 +415,8 @@ const SKILLS = {metallurgy:{metallurgy:3,math:1,management:1},machinery:{mechani
 export const PROJECTS = [...CATALOG,...EXTRA].map(item=>{
  const [family,level,capacity,equipment,milestoneRequirements,prerequisites]=SPEC[item.id];
  const familyName=FAMILIES.find(f=>f.id===family)?.name||'铸造';
- const contribution=item.id==='repair_corps'?'军中修械队使每次训练从25提高至30，换装仍保留训练成果。':capacity?`${familyName}供军产能 +${capacity}；同类取最高，不叠加。`:equipment?`${familyName}装备效能 ${equipment.toFixed(2)}；同类取最高，枪炮需配套弹药。`:item.id==='joint_trials'?'对李自成与清军两战线评分均达100，即刻获胜。':`${familyName}等级 ${level}；用于里程碑、配套或训练条件，同类取最高。`;
- return {...item,era:item.id==='joint_trials'?9:Math.max(0,Math.min(8,level+milestoneRequirements.length)),family,familyName,level,capacity,equipment,contribution,benefits:contribution,milestoneRequirements,prerequisites,prerequisiteAny:[],facilityRequirements:FACILITY_REQUIREMENTS[item.id]||[],specialtyRequirements:SKILL_OVERRIDES[item.id]||SKILLS[item.branch],work:item.id==='joint_trials'?1:Math.min(item.work,2),...(item.id==='joint_trials'?{tags:['两路守京','自动达成'],layoutPrerequisites:[]}:{}),transfers:Object.fromEntries(Object.entries(item.transfers||{}).filter(([id])=>id!==item.id))};
+ const contribution=item.id==='repair_corps'?'军中修械队使每次训练从25提高至30，换装仍保留训练成果。':capacity?`${familyName}供军产能 +${capacity}；同类取最高，不叠加。`:equipment?`${familyName}装备效能 ${equipment.toFixed(2)}；同类取最高，枪炮需配套弹药。`:item.id==='joint_trials'?'最后一季完成战斗与补员后，三条战线敌军均不超过平定线，则达成胜利。':`${familyName}等级 ${level}；用于里程碑、配套或训练条件，同类取最高。`;
+ return {...item,era:item.id==='joint_trials'?9:Math.max(0,Math.min(8,level+milestoneRequirements.length)),family,familyName,level,capacity,equipment,contribution,benefits:contribution,milestoneRequirements,prerequisites,prerequisiteAny:[],facilityRequirements:FACILITY_REQUIREMENTS[item.id]||[],specialtyRequirements:SKILL_OVERRIDES[item.id]||SKILLS[item.branch],work:item.id==='joint_trials'?1:Math.min(item.work,2),...(item.id==='joint_trials'?{tags:['三线平定','终局结算'],layoutPrerequisites:[]}:{}),transfers:Object.fromEntries(Object.entries(item.transfers||{}).filter(([id])=>id!==item.id))};
 });
 const FACILITY_CATALOG = [
  {id:'workshop',name:'基础工坊',icon:'坊',cost:16000,prerequisites:[],milestoneRequirements:[],description:'整备工位与试制场地，开启勘察、量具和初期工艺。'},
