@@ -1,0 +1,302 @@
+/* Ming palace lacquer and carved-red ware inspire this restrained interface palette.
+   The panorama's atmosphere filter is deliberately independent of the UI theme. */
+:root{
+  --ink:#3d2d25;
+  --muted:#563c29;
+  --paper:#c8b797;
+  --card:#d0bf9e;
+  --line:#aa926b;
+  --gold:#b39761;
+  --red:#70382d;
+  --wood:#24211e;
+  --ming-lacquer:#542923;
+  --ming-lacquer-dark:#32221e;
+  --ming-lacquer-light:#784332;
+  --ming-gold:#b39761;
+  --ming-gold-light:#dfc494;
+  --ming-paper:#c8b797;
+  --ming-paper-light:#d1c2a3;
+  --ming-paper-shade:#b8a481;
+  --ming-ink:#3d2d25;
+  --ming-muted:#563c29;
+}
+body{background:#211d1a;color:var(--ming-ink)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline-color:#c69f57}
+.game-hud,.game-dock{background:linear-gradient(180deg,#522e28f5,#2b211ef7);border-color:#ac8a53;outline-color:#33251e;box-shadow:0 8px 30px #130e0c80,inset 0 0 0 4px #b397611b}
+.game-brand{color:#e5cda1}
+.game-brand small,.hud-resource small{color:#c0a783}
+.hud-resource strong{color:#ead6b0}
+.hud-resource em{color:#bda783}
+.hud-resource{border-right-color:#b3976140}
+.hud-symbol,.dock-item .icon{color:#bda16d}
+.hud-utilities button{background:#2a201c88;border-color:#ad8e534f;color:#c3a577}
+.hud-utilities button:hover{color:#f0d49b;border-color:#c2a26b;background:#62382b}
+.imperial-seal{background:#743d2e;border-color:#c0a16b;color:#e5cda1;box-shadow:inset 0 0 0 2px #5b3027}
+.dock-item{color:#c1ab88}
+.dock-item:hover,.dock-item.active{background:linear-gradient(#87473166,#6b3b2d20);border-color:#bc945260;color:#ead0a1}
+.dock-item.active:after{background:#c5a05b}
+.season-block{border-right-color:#b3976155;color:#c9ae80}
+.season-block small,.season-block span{color:#baa381}
+.season-block strong{color:#ddbd7f}
+.end-season{background:linear-gradient(135deg,#7d4030,#4f2822);border-left-color:#c5a05b77;color:#ead0a1;box-shadow:inset 0 0 0 4px #c8a4681e}
+.end-season small{color:#c6a480}
+.brass-button{background:linear-gradient(#9a7948,#72552f);border-color:#b89a62;color:#ead8b1;box-shadow:inset 0 0 0 2px #d1ae6922}
+.strategy-plaque{background:#432924e8;border-color:#a4824c99;color:#e5c99c}
+.world-callout{background:linear-gradient(90deg,#c9b594f2,#bca987f2);border-color:#9b784a;color:#422e23}
+.world-callout p{color:#69503b}
+.world-notice{background:#3c2922ed;border-color:#b3976180;color:#dfc89e}
+.world-notice button{color:#d4b787}
+
+/* Lacquer frames, with quieter parchment inside the documents. */
+.game-window,.game-window.atlas-window{background:var(--ming-paper);border-color:#ad8e56;outline-color:#3a261e;box-shadow:0 15px 80px #180f0cb3,inset 0 0 0 4px #9b754527}
+.window-titlebar{background:linear-gradient(#64372c,#422720);border-bottom-color:#aa8750;color:#e1c69a}
+.window-titlebar small,.window-season{color:#c0a37a}
+.title-decoration{color:#bc985a}
+.window-titlebar>button{background:#35221d;border-color:#b3976177;color:#d3b47d}
+.window-titlebar>button:hover{background:#844b35;color:#f2dab0}
+.window-content{background:radial-gradient(ellipse at 90% 0,#d7c6a34d,transparent 60%),repeating-linear-gradient(17deg,#543c2407 0 1px,transparent 1px 5px);scrollbar-color:#8d704c #bcaa88}
+.window-footer{background:#b8a481;border-color:#a38961;color:#59412f}
+.window-footer button{color:#61412b}
+.window-intro,.window-rule span{color:#624b38}
+.window-rule{background:#c1ae8b;border-color:#a78c62}
+.window-rule strong{color:#513326}
+.small-button{background:#d0bc94;border-color:#a5895d;color:#503725}
+.small-button:hover:not(:disabled){background:#dbc59b;border-color:#916936}
+.small-button.primary{background:linear-gradient(#754333,#502b24);border-color:#a2804f;color:#ead3a7;box-shadow:inset 0 0 0 2px #c2a2641b}
+.small-button.primary:hover:not(:disabled){background:#814937;border-color:#b7985b}
+.small-button.primary:disabled{background:#b8a381;color:#6a5540;border-color:#a8926b}
+.small-button.danger{background:#743a2c;border-color:#9d6747;color:#ecd2a5}
+.text-button{color:#6a3f2b}
+.progress-track,.tiny-progress{background:#a9946b66}
+.progress-track>span,.tiny-progress>i{background:#936443}
+.status-badge{background:#bbab88;color:#62503a;border-color:#9b8259}
+.status-badge.is-complete{background:#b9a16d;color:#503b21}
+.status-badge.is-invested{background:#c1ab81;color:#64452e}
+.status-badge.is-ready{background:#cfb581;color:#694321}
+
+/* Research parchment stays readable; artwork and status frames live in media-assets.css. */
+.research-board{background:#b9a789}
+.research-milestones{background:linear-gradient(#bcaa87,#c7b594);border-bottom-color:#987c50}
+.milestone-heading,.milestone-heading b{color:#593d2b}
+.milestone-heading small,.milestone-heading em{color:#735b41}
+.milestone-heading>strong{color:#78482c}
+.milestone-item{background:#cfc09e;border-color:#aa9269;box-shadow:inset 0 0 0 2px #e3d2ad2e}
+.milestone-item>strong{color:#563c2a}
+.milestone-item>small{color:#70573c}
+.milestone-mark>span{color:#92703e}
+.milestone-progress{background:#ad9972}
+.milestone-progress>i{background:#956b3e}
+.milestone-item:hover{border-color:#886033;background:#d5c39f}
+.milestone-item.is-complete{background:linear-gradient(135deg,#c6b079,#b99b63);border-color:#8f6a34}
+.milestone-item.is-complete>strong,.milestone-item.is-complete .milestone-mark>span{color:#503718}
+.milestone-item.is-complete>small{color:#634c2a}
+.milestone-item.is-complete .milestone-progress>i{background:#7d572b}
+.milestone-item.is-complete:hover{background:#c9ae74}
+.milestone-item.is-selected{outline-color:#7f442d}
+.research-team-rail{background:linear-gradient(90deg,#b6a181,#c2ae8c);border-right-color:#997c53}
+.research-team-rail>header{background:#bcaa88;border-color:#a28b63;color:#573e2b}
+.research-team-rail>header small{color:#775c3f}
+.research-team-rail>header>button{color:#6c4029}
+.research-team-list{scrollbar-color:#93734a #b9a481}
+.research-team-card{background:#cbbb99;border-color:#aa9167;color:#5c4734;box-shadow:inset 0 0 0 2px #e1cfa72e}
+.team-card-heading>strong{color:#503527}
+.team-card-heading>small,.team-card-work,.team-card-meta>small{color:#6c523b}
+.team-card-meta>b{color:#734729}
+.team-card-progress{background:#aa9670}
+.team-card-progress>span{background:#9a6a3f}
+.research-team-card.is-busy{background:#c0ad8c;border-color:#a68e65}
+.research-team-card.is-busy .team-card-heading>small{color:#795039}
+.research-team-card:hover{background:#d2bd94;border-color:#8e653b}
+.research-team-card.is-selected{background:linear-gradient(#824b38,#673c2e);border-color:#b9985f;box-shadow:inset 0 0 0 2px #caa86b33,0 0 0 1px #785532}
+.research-team-card.is-selected .team-card-heading>strong{color:#efdbb5}
+.research-team-card.is-selected .team-card-heading>small,.research-team-card.is-selected .team-card-work,.research-team-card.is-selected .team-card-meta>small{color:#d4b98e}
+.research-team-card.is-selected .team-card-meta>b{color:#e0c28c}
+.research-team-card.is-selected .team-card-progress{background:#40271e}
+.research-team-card.is-selected .team-card-progress>span{background:#c9a25b}
+.team-rail-note{border-color:#9e8258;color:#674b34}
+.research-navigation{background:#c9b797;border-color:#9e8155}
+.research-tab{color:#71583e}
+.research-tab small{color:#806549}
+.research-tab:hover{background:#9c74442b;color:#633c29}
+.research-tab.is-active{background:linear-gradient(#8b52332b,#91553336);border-color:#8c4a2f;color:#532f22}
+.research-tab.is-active small{color:#70442a}
+.research-search{background:#d5c39f;border-color:#aa8f5f}
+.research-search input{color:#4b3425}
+.research-search input::placeholder{color:#7e6346}
+.research-search>button{color:#70462c}
+.research-card-scroll{background:radial-gradient(ellipse at top right,#d7c7a833,transparent 65%),repeating-linear-gradient(17deg,#5a3e2606 0 1px,transparent 1px 5px);scrollbar-color:#96724a #b7a482}
+.research-empty{color:#6e543a;border-color:#9a7f56}
+.research-detail-dock{background:#c6b28e;border-top-color:#977649}
+.tech-detail-horizontal>section{scrollbar-color:#8d6a43 #b6a17c}
+.tech-detail-horizontal>section+section{border-left-color:#a2865b}
+.tech-detail-horizontal>.detail-team{background:linear-gradient(135deg,#c6b58e,#bba37f)}
+.tech-detail-horizontal .detail-catalogue{color:#745232}
+.tech-detail-horizontal h3{color:#543526}
+.team-detail-specialties>div{border-bottom-color:#8b6b4055}
+.team-detail-specialties>div>span,.team-detail-specialties b{color:#705439}
+.team-detail-specialties>div.is-relevant>span,.team-detail-specialties>div.is-relevant>b{color:#632f22}
+.team-detail-work,.detail-forecast,.research-operation-note{color:#66482f}
+.detail-metrics{color:#6b4b30}
+.detail-metrics b{color:#814c2c}
+.detail-overview{background:radial-gradient(ellipse at top left,#e0cba455,transparent 80%)}
+.detail-contribution{color:#5b432e}
+.research-specialties>span{background:#bba67e;color:#62452d}
+.research-specialties i{color:#87623d}
+.detail-prerequisites{border-top-color:#9f815755}
+.detail-prerequisites>h4{color:#68452b}
+.tech-detail-horizontal .dependency-list>span{color:#6e5137}
+.dependency-chip{background:#d0ba90;border-color:#a9915e;color:#6d482c}
+.dependency-chip.complete{background:#c0a76e;border-color:#9a7b44;color:#59401e}
+.dependency-chip:hover{background:#ddc79c;color:#5e3521;border-color:#8d602f}
+.tech-detail-horizontal .detail-locked,.tech-detail-horizontal .transfer,.transfer-line{color:#795331}
+.detail-background{background:#cbbb99}
+.detail-background p{color:#4e3c2d}
+.detail-background p>strong,.detail-background p>b{color:#6b3927}
+.detail-background a{color:#733e27;text-decoration-color:#9d7947}
+.detail-empty{color:#7d603f}
+.detail-empty>.icon{color:#92703f}
+.tech-detail-horizontal .detail-empty h3{color:#63472f}
+.detail-empty p{color:#76583b}
+.milestone-popup{background:#c8b28d;border-color:#987342;outline-color:#42281d;box-shadow:0 18px 80px #1b100c80;scrollbar-color:#947047 #bda680}
+.milestone-inspector{background:linear-gradient(135deg,#d4c09a,#c0a67d);box-shadow:inset 0 0 0 4px #dfc89633}
+.milestone-inspector>header span{color:#846039}
+.milestone-inspector h4{color:#5d3424}
+.milestone-inspector>header>button{background:#c0a77a;border-color:#9a7748;color:#68452b}
+.milestone-inspector>p,.milestone-inspector .milestone-inspector-note{color:#674c32}
+.milestone-requirement{background:#d9c39b44;border-color:#a1845455}
+.milestone-requirement-label>strong{color:#68452a}
+.milestone-requirement-label>span,.milestone-requirement>small{color:#7d5b37}
+.milestone-requirement.is-complete .milestone-requirement-label>strong{color:#805022}
+.milestone-candidates>button{background:#d3bc91;border-color:#a28a59;color:#674429}
+.milestone-candidates>button:hover{background:#dfc797;border-color:#95672f;color:#522e1d}
+.milestone-candidates>button.is-complete{background:#bfa066;border-color:#94713a;color:#553b20}
+.milestone-candidates>span{color:#765637}
+
+/* People, construction, training and the war cabinet share the same paper stock. */
+.team-card,.training-card,.estate-build-card,.front-card,.manual-grid section{background:#c9b794;border-color:#a2875d;box-shadow:inset 0 0 0 3px #ddc69b22}
+.team-card.occupied,.team-card.candidate{background:#beab89}
+.team-card h3,.training-card h3,.build-copy h3,.personnel-heading h3,.section-heading h3,.manual-grid h4{color:#583728}
+.team-card header small,.team-card>footer,.team-card footer small,.personnel-guide,.personnel-heading p,.section-heading>span{color:#674b34}
+.team-card>footer{border-top-color:#9e805355}
+.team-card footer strong{color:#7a4b2b}
+.specialty>span,.specialty>b{color:#705337}
+.specialty.strong>span,.specialty.strong>b{color:#6d3024}
+.specialty.strong .progress-track span{background:#8d4b31}
+.team-emblem{background:#b59d71;border-color:#947344;color:#6c4226}
+.dismiss-team,.team-reason{color:#853e2b}
+.personnel-count{color:#86613b}
+.personnel-count b{color:#73412b}
+.personnel-tabs{border-color:#9e8054}
+.personnel-tabs button{color:#745337}
+.personnel-tabs button b{color:#856542}
+.personnel-tabs button.selected{background:#7c4935;border-color:#b3965b;color:#ecd3aa}
+.personnel-tabs button.selected b{color:#d1b280}
+.personnel-tabs button:hover{background:#a16d422b}
+.personnel-tabs button.selected:hover{background:#885039}
+.recruitment-banner,.combat-factors,.window-rule,.economy-rule{background:#bba57e;border-color:#9a784c}
+.recruitment-banner h3,.combat-factors strong,.economy-rule{color:#5c3623}
+.recruitment-banner p,.combat-factors small,.combat-factors p,.combat-factors strong em,.economy-rule small{color:#674a2f}
+.recruit-empty{color:#765337}
+.front-card h4,.front-card strong{color:#75472a}
+.front-card strong small,.front-card p{color:#6d4f33}
+.front-card.ready{background:#c1ab77;border-color:#98713b}
+.front-card.ready h4,.front-card.ready strong{color:#65451f}
+.industry-ledger{border-color:#a18456;color:#62472e}
+.industry-ledger p{border-bottom-color:#a68b5b66}
+.industry-ledger strong{color:#73442b}
+.doctrine-heading>span{color:#5b3626}
+.doctrine-heading>p{color:#6b4e34}
+.doctrine-option{background:#c9b591;border-color:#a58a5d;color:#62472e}
+.doctrine-radio{color:#916b3a}
+.doctrine-option strong{color:#60402a}
+.doctrine-option small{color:#6f5137}
+.doctrine-option.is-selected{background:linear-gradient(#754332,#502d24);border-color:#ad8950;box-shadow:inset 0 0 0 3px #c0a26422}
+.doctrine-option.is-selected strong{color:#ecd5aa}
+.doctrine-option.is-selected small{color:#c3aa82}
+.doctrine-option.is-selected .doctrine-radio{color:#d3b16c}
+.build-copy>p,.build-requires,.build-unlocks,.build-bottom>span,.build-copy .build-reason{color:#694d33}
+.build-requires small,.build-unlocks small{color:#7a5837}
+.build-unlocks button{background:#c3ad80;border-color:#9f814f;color:#69452b}
+.build-state{background:#41251edb;border-color:#c0a16b77;color:#dfc79e}
+.estate-build-card.built{border-color:#a27f43}
+.building-budget{background:#bda47a;border-color:#9b7947}
+.building-budget small,.building-budget>span{color:#684a2c}
+.building-budget strong{color:#744127}
+.training-card .training-symbol{background:#b9a478;border-color:#957541;color:#784c2b}
+.training-card p,.training-reason{color:#6c4d32}
+.training-card .training-meter{color:#76492d}
+.training-meter small{color:#82613f}
+.help-opening h3{color:#603927}
+.help-opening p,.manual-grid p{color:#694c32}
+.manual-grid b{color:#90673b}
+.campaign-timeline>div{border-color:#9f8255}
+.campaign-timeline small,.campaign-timeline span{color:#7d5c3a}
+.campaign-timeline strong{color:#69442a}
+.archive{background:#c5b18e;border-color:#a0855c}
+.log-row{border-bottom-color:#ad936b66}
+.log-dot{background:#a47d43}
+.log-dot.bad{background:#8d4630}
+.log-date{color:#81603d}
+.log-info strong{color:#60402a}
+.log-info p{color:#6d5036}
+
+/* Dialogs retain the same hierarchy, including the stronger vermilion failure note. */
+.modal-backdrop{background:#1d1512d9}
+.modal{background:linear-gradient(135deg,#d0bc96,#c2ab83);border-color:#ad8851;outline-color:#3b261d;box-shadow:inset 0 0 0 5px #8e643224,0 25px 90px #100b08aa}
+.modal h2{color:#5b3425}
+.modal p{color:#674a32}
+.modal .modal-eyebrow{color:#865d35!important}
+.modal-detail{background:#bba47c;border-color:#a18351}
+.modal-detail-row{color:#694b30}
+.modal-detail-row strong{color:#5b3723}
+.modal-actions{border-color:#a88b5d}
+.modal-close{color:#7c562f}
+.modal-choice{background:#d1bb91;border-color:#aa8955;color:#623b25}
+.modal-choice small{color:#775637}
+.modal-choice:hover:not(:disabled){background:#ddc69a;border-color:#93642f}
+.big-probability,.trial-summary .big-probability{color:#835334}
+.result-copy{background:#b99f73;border-color:#8e5c35;color:#5c3c25}
+.result-stats{border-color:#9f7e4d}
+.result-stats span{color:#735032}
+.result-stats strong{color:#73402a}
+.toast{background:#412a21f5;border-color:#b5976088;color:#e3cca1;box-shadow:0 8px 28px #190e0966}
+.toast.error{background:#783d2c}
+.trial-summary{background:#bda780;border-color:#a98b58}
+.trial-summary .big-probability small{color:#735135}
+.trial-audience-choice{background:#cfb990;border-color:#a88a59;color:#68452d}
+.trial-audience-choice>small{color:#745336}
+.trial-choice-title i{color:#936b36}
+.trial-choice-stakes{border-top-color:#94704255}
+.trial-audience-choice:hover{border-color:#8b5d31;background:#d9bf92}
+.trial-audience-choice.is-selected{background:linear-gradient(#784732,#542e23);border-color:#ad8c51;color:#ecd6ae;box-shadow:inset 0 0 0 2px #c8a66d22}
+.trial-audience-choice.is-selected small{color:#cfb68c}
+.trial-audience-choice.is-selected .trial-choice-title i{color:#d7b571}
+.trial-reputation,.modal .trial-risk{color:#6c4b30}
+.trial-reputation b{color:#704026}
+.trial-reputation .is-danger,.trial-reputation .is-danger b{color:#8d3425}
+.modal .trial-risk.is-fatal{background:#9b432b16;border-left-color:#9a4a2e;color:#813522}
+.prestige-ending{background:radial-gradient(ellipse at top right,#8c3d2922,transparent 60%),#c8b08a;border-color:#9b633e}
+.prestige-ending h2{color:#753724}
+.prestige-ending .ending-reason{background:#923a2215;border-color:#9b5738;color:#813c25}
+.prestige-ending .result-stats strong{color:#843e28}
+
+/* Small labels need stronger ink on the intentionally dimmer paper. */
+.window-intro,.window-rule span,.detail-contribution,.detail-background p,
+.modal p,.modal-detail-row,.modal-choice small,.trial-reputation,.modal .trial-risk,
+.recruitment-banner p,.personnel-guide,.personnel-heading p,.section-heading>span,
+.team-card header small,.team-card>footer,.team-card footer small,.specialty>span,.specialty>b,
+.build-copy>p,.build-requires,.build-unlocks,.build-bottom>span,.build-copy .build-reason,
+.training-card p,.training-reason,.help-opening p,.manual-grid p,
+.combat-factors small,.combat-factors p,.combat-factors strong em,.front-card p,
+.doctrine-heading>p,.doctrine-option small,.industry-ledger,.log-info p{color:#563c29}
+.research-team-card:not(.is-selected) .team-card-heading>small,
+.research-team-card:not(.is-selected) .team-card-work,
+.research-team-card:not(.is-selected) .team-card-meta>small,
+.team-rail-note,.window-footer,.team-detail-work,.detail-forecast,.research-operation-note,
+.team-detail-specialties>div>span,.team-detail-specialties b,.detail-metrics,
+.tech-detail-horizontal .detail-catalogue,.research-tab small,.milestone-item>small,
+.milestone-heading small,.milestone-heading em,.research-specialties>span,.detail-empty p{color:#503624}
+.window-titlebar small,.window-season,.game-brand small,.hud-resource small{color:#cfb58d}
+.trial-audience-choice>small,.trial-summary .big-probability small{color:#563c29}
+.trial-audience-choice.is-selected small,.doctrine-option.is-selected small{color:#cfb68c}
+.modal .trial-risk.is-fatal{color:#813522}

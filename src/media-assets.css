@@ -1,0 +1,115 @@
+/* The hollow gear and Ming character form the imperial workshop emblem. */
+.game-brand .brand-logo{display:block;width:50px;height:50px;flex:0 0 auto;filter:drop-shadow(0 1px 2px #1c100bb3)}
+@media(max-width:900px){.game-brand .brand-logo{width:40px;height:40px}}
+@media(max-width:760px){.game-brand .brand-logo{width:36px;height:36px}}
+
+/* Painted research cards retain their names and explicit status labels. */
+.research-card-grid{grid-auto-rows:78px;gap:5px}
+.research-card{height:78px;padding:8px 10px 7px;isolation:isolate;background:#30271f;border-color:#897153;box-shadow:inset 0 0 0 1px #c2a77726}
+.research-card-art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;object-position:56% 50%;filter:saturate(.77) brightness(1.05);pointer-events:none}
+.research-card::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#211913db 0%,#251a1470 55%,#231a1426 100%),linear-gradient(0deg,#17120fe8,transparent 70%);pointer-events:none}
+.research-card h4,.research-card.is-selected h4{color:#f0dfbb;font-size:14px;line-height:1.25;max-width:94%;text-shadow:0 1px 3px #100a07}
+.research-card .research-card-status{color:#ddc9a6;font-size:9px;text-shadow:0 1px 3px #100a07}
+.research-card .research-card-bottom>b{color:#e2c89b;font-size:12px;text-shadow:0 1px 3px #100a07}
+.research-card .research-card-progress{height:2px;background:#b9985c2e;z-index:1}
+.research-card .research-card-progress>i{background:#b58c55}
+.research-card:hover{background:#30271f;border-color:#c2a579;box-shadow:inset 0 0 0 1px #c7aa6d66}
+.research-card.is-locked{background:#3c3831;border-color:#827d71;box-shadow:inset 0 0 0 1px #c5bdac15}
+.research-card.is-locked .research-card-art{filter:grayscale(1) brightness(.9);opacity:.65}
+.research-card.is-locked::before{background:linear-gradient(90deg,#292722c9,#28272250),linear-gradient(0deg,#21201ce8,transparent 70%)}
+.research-card.is-locked h4{color:#d0c9b8}
+.research-card.is-locked .research-card-status,.research-card.is-locked .research-card-bottom>b{color:#b9b2a3}
+.research-card.is-waiting{background:#30271f;border-color:#87765e}
+.research-card.is-waiting .research-card-art{filter:grayscale(.55) brightness(.94)}
+.research-card.is-waiting .research-card-status{color:#cfb998}
+.research-card.is-invested{background:#30271f;border-color:#ae8655;box-shadow:inset 0 0 0 1px #ac845344}
+.research-card.is-invested .research-card-status{color:#e0bc87}
+.research-card.is-ready{background:#30271f;border-color:#d1ac68;box-shadow:inset 0 0 0 1px #b59054,0 0 6px #8d5a3026}
+.research-card.is-ready .research-card-status{color:#f1d49b}
+.research-card.is-complete{background:#30271f;border-color:#bca06b;box-shadow:inset 0 0 0 2px #b392574d,0 0 5px #9b71352b}
+.research-card.is-complete .research-card-art{filter:saturate(.9) brightness(1.12)}
+.research-card.is-complete .research-card-status,.research-card.is-complete .research-card-bottom>b{color:#edcd8d}
+.research-card.is-complete .research-card-progress>i{background:#d0ae6b}
+.research-card.is-selected{background:#30271f;border-color:#dfb478;box-shadow:inset 0 0 0 2px #9d4e34,0 0 0 1px #6e3729}
+.research-card.is-selected::after{content:'';position:absolute;top:5px;right:5px;width:5px;height:5px;background:#d8a368;transform:rotate(45deg);box-shadow:0 0 0 1px #653321;pointer-events:none}
+
+/* A faint illustration sits behind the objective background notes. */
+.detail-background{position:relative;isolation:isolate}
+.detail-background-art{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:center;opacity:.14;filter:grayscale(.45) sepia(.2) brightness(1.08);pointer-events:none}
+.detail-background:not(.detail-empty){background:#cbbb99}
+.detail-background p{color:#392b21;text-shadow:0 1px #dfcfaa50}
+.detail-background p>b{color:#6a3524}
+
+/* One portrait per specialty, selected from the team's strongest ability. */
+.team-portrait{position:relative;display:inline-block;flex:0 0 auto;overflow:hidden;width:40px;height:44px;border:1px solid #9c7848;background:#33251e;box-shadow:inset 0 0 0 1px #d9b87540;vertical-align:middle}
+.team-portrait img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 34%;filter:saturate(.8);pointer-events:none}
+.team-portrait::after{content:'';position:absolute;inset:1px;border:1px solid #dab37336;pointer-events:none}
+.team-portrait--large{width:62px;height:68px}
+.team-portrait--inline{width:23px;height:24px}
+.team-card-identity{display:flex;align-items:center;gap:7px;min-width:0;margin-bottom:6px}
+.team-card-label{flex:1;min-width:0}
+.team-card-identity .team-card-heading{display:block;position:relative}
+.team-card-identity .team-card-heading>strong{display:block;font-size:12px;line-height:16px}
+.team-card-identity .team-card-heading>small{display:block;font-size:7px;line-height:11px}
+.team-card-identity .team-card-work{margin:2px 0 0;font-size:9px;line-height:13px}
+.research-team-card.is-selected .team-portrait{border-color:#c5a46b}
+.team-control-heading .team-portrait{margin-right:1px}
+.team-card>header{min-width:0;gap:13px;margin-bottom:15px}
+.team-card>header>div{min-width:0}
+.team-card>header h3{overflow-wrap:anywhere;line-height:1.45}
+.facility-team,.training-team{display:flex;align-items:center;gap:7px;min-width:0}
+.facility-team>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.training-team{margin:10px 0 8px;font-size:11px;color:#67462e}
+.team-dismiss-heading{display:flex;align-items:center;gap:16px;margin:0 0 18px}
+.team-dismiss-heading h2{margin:0;font-size:23px}
+.victory-art{display:block;width:100%;height:155px;object-fit:cover;object-position:50% 40%;border:1px solid #a3814a;margin:0 0 18px;filter:saturate(.8) brightness(.85)}
+
+/* Milestones express shared capabilities, rather than a specific research route. */
+.milestone-mark{position:relative;justify-content:center;color:#816138}
+.milestone-mark>.icon{width:22px;height:25px;stroke-width:1.45}
+.build-unlocks button{display:inline-flex;align-items:center;gap:4px}
+.build-unlocks button>.icon{width:13px;height:13px;flex:0 0 auto}
+.milestone-inspector h4{display:flex;align-items:center;gap:9px}
+.milestone-inspector h4>.icon{width:25px;height:25px;color:#816138}
+.milestone-item.is-complete .milestone-mark{color:#5d3c1c}
+.milestone-mark>.milestone-tick{position:absolute;bottom:-1px;right:-3px;width:11px;height:11px;font:8px/11px sans-serif;background:#6d4d29;color:#f1d7a3;border:1px solid #c7ad78}
+.milestone-item.is-complete .milestone-mark>.milestone-tick{color:#f1d7a3}
+@media(min-width:1500px) and (min-height:800px){
+ .research-card-grid{grid-auto-rows:82px}
+ .research-card{height:82px;padding:9px 11px}
+ .research-card h4{font-size:15px}
+ .team-portrait{width:44px;height:48px}
+ .team-portrait--inline{width:23px;height:24px}
+ .team-portrait--large{width:62px;height:68px}
+ .team-card-identity .team-card-heading>strong{font-size:13px}
+}
+@media(max-width:1150px){
+ .team-card-identity{gap:6px}
+ .team-portrait{width:33px;height:40px}
+ .team-portrait--inline{width:23px;height:24px}
+ .team-portrait--large{width:62px;height:68px}
+ .team-card-identity .team-card-heading>strong{font-size:11px}
+ .team-card-identity .team-card-work{font-size:8px}
+ .milestone-mark>.icon{width:18px;height:23px}
+}
+@media(max-height:850px) and (min-width:761px){
+ .research-card-grid{grid-auto-rows:66px}
+ .research-card{height:66px;padding:6px 8px}
+ .research-card h4{font-size:13px}
+}
+@media(max-width:760px){
+ .research-card-grid{grid-auto-rows:72px}
+ .research-card{height:72px;padding:6px}
+ .research-card h4{font-size:12px}
+ .research-card .research-card-status{font-size:8px}
+ .research-card .research-card-bottom>b{font-size:10px}
+ .team-card-identity{display:grid;grid-template-columns:27px minmax(0,1fr);gap:5px;align-items:start}
+ .team-portrait{width:27px;height:34px}
+ .team-portrait--inline{width:23px;height:24px}
+ .team-portrait--large{width:54px;height:60px}
+ .team-card-identity .team-card-heading>strong{font-size:10px;line-height:14px}
+ .team-card-identity .team-card-work{font-size:8px}
+ .milestone-mark>.icon{width:17px;height:21px}
+ .team-dismiss-heading{gap:10px}
+ .team-dismiss-heading h2{font-size:19px}
+}

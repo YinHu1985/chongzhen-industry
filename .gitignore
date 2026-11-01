@@ -1,0 +1,18 @@
+dist/
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+.cache/
+coverage/
+
+# Local previews and development records; runtime artwork stays in Git.
+artifacts/
+PROGRESS.txt
+assets/**/*prompts.json
+assets/ARTWORK.txt
+assets/*ART-NOTES.txt
+.codex/
+.agents/

@@ -1,0 +1,16 @@
+{
+  "name": "chongzhen-industry",
+  "version": "0.4.0",
+  "private": true,
+  "description": "崇祯工业：限期工业化与新军建设的回合制网页游戏原型",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs --dir dist",
+    "test": "node --test"
+  }
+}

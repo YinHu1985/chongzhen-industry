@@ -1,0 +1,43 @@
+/* The opening screen reveals the untouched estate, never its completed form. */
+.title-screen{position:relative;isolation:isolate;width:100%;height:100dvh;min-height:0;overflow:auto;display:grid;align-items:center;justify-items:start;padding:42px clamp(30px,7vw,112px);color:#e9d1a4;background:#1b211e;scrollbar-color:#876a45 #241b17}
+.title-landscape,.title-shade{position:fixed;inset:0;pointer-events:none}
+.title-landscape{z-index:-3;background:url('../assets/estate-panorama-unbuilt.png') 61% center/cover no-repeat;filter:brightness(.6) saturate(.6) contrast(1.08)}
+.title-shade{z-index:-2;background:linear-gradient(90deg,#171715ed 0%,#211b18df 24%,#211b18ae 47%,#11191525 78%),linear-gradient(0deg,#111816d9,transparent 27%,transparent 76%,#16181580),radial-gradient(ellipse at 65% 45%,transparent 20%,#11120f70)}
+.title-screen::before{content:'';position:fixed;inset:18px;border:1px solid #b397614d;box-shadow:inset 0 0 0 4px #b397610d;pointer-events:none;z-index:-1}
+.title-content{width:min(560px,100%);text-align:center;padding:10px 0;justify-self:start}
+.title-brand{display:flex;flex-direction:column;align-items:center}
+.title-emblem{display:block;width:88px;height:88px;filter:drop-shadow(0 3px 9px #090706a6)}
+.title-kicker{margin:18px 0 12px;font-size:11px;letter-spacing:5px;color:#b9a17b}
+.title-brand h1{font:600 clamp(54px,5.6vw,80px)/1.2 var(--serif);letter-spacing:.15em;text-indent:.15em;color:#e4c48c;margin:0;text-shadow:0 3px 2px #1a110c,0 8px 30px #110c08}
+.title-prologue{font:15px/2.1 var(--serif);letter-spacing:1px;color:#c3ae87;margin:25px -10px 0}
+.title-prologue strong{font-weight:500;color:#dec49b}
+.title-rule{display:flex;align-items:center;justify-content:center;gap:15px;width:240px;max-width:75%;margin:22px auto;color:#a58048;font-size:8px}
+.title-rule::before,.title-rule::after{content:'';height:1px;flex:1;background:linear-gradient(90deg,transparent,#a580486b)}
+.title-rule::after{transform:rotate(180deg)}
+.title-menu{width:min(340px,100%);margin:0 auto;display:grid;gap:9px}
+.title-screen button{transition:none;transform:none}
+.title-screen button:not(:disabled):active{transform:none}
+.title-menu-button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:51px;padding:12px 32px;border:1px solid #a7834c66;color:#dfc597;background:linear-gradient(90deg,#31231c75,#4d3025b8,#31231c75);box-shadow:inset 0 0 0 3px #c09d5710;text-shadow:0 1px 2px #1d110e}
+.title-menu-button:hover:not(:disabled){color:#f4dfb5;border-color:#c2a06b;background:linear-gradient(90deg,#613a28b0,#7c4831de,#613a28b0)}
+.title-menu-button:focus-visible{outline:2px solid #d2ad6e;outline-offset:4px}
+.title-menu-label{font:500 20px/1.2 var(--serif);letter-spacing:5px;text-indent:5px}
+.title-menu-button>.icon,.title-menu-button>span[aria-hidden]{position:absolute;right:16px;width:16px;height:16px;font-size:18px;opacity:.62}
+.title-continue{min-height:70px;background:linear-gradient(90deg,#4e2a22b0,#703b2de3,#4e2a22b0);border-color:#b997608c}
+.title-menu-button small{margin-top:8px;font-size:10px;line-height:1.5;letter-spacing:.4px;color:#c4aa80}
+.title-menu-button:disabled{opacity:.48;cursor:default;background:#2c231f70;border-color:#8c78554a}
+.title-continue:disabled + .title-new{background:linear-gradient(90deg,#4e2a22b0,#703b2de3,#4e2a22b0);border-color:#b997608c}
+.title-notice{max-width:390px;margin:15px auto 0;font-size:12px;line-height:1.75;color:#e7b17f}
+.title-music{display:flex;justify-content:center;align-items:center;gap:18px;margin:25px auto 0;color:#bba480}
+.title-music-toggle{display:flex;align-items:center;gap:7px;min-height:30px;padding:2px 5px;border:0;background:transparent;font-size:11px;color:inherit}
+.title-music-toggle:hover{color:#edd2a0}
+.title-music-glyph{font:17px/1 Georgia,serif;color:#c7a36b}
+.title-volume{display:flex;align-items:center;gap:7px;font-size:10px}
+.title-volume input{width:88px;height:18px;margin:0;accent-color:#b99760;cursor:pointer}
+.title-save-hint{margin:12px -10px 0;font-size:10px;line-height:1.8;letter-spacing:.2px;color:#9c8e76}
+.title-side-seal{position:fixed;right:48px;bottom:48px;padding:12px 9px;border:1px solid #a1744d70;color:#b18a68;background:#3d20175c;font:14px/1.9 var(--serif);letter-spacing:4px;writing-mode:vertical-rl;text-shadow:0 1px 3px #20100b}
+@media(min-width:1600px) and (min-height:900px){.title-screen{padding-left:10vw}.title-content{width:600px}.title-emblem{width:102px;height:102px}.title-brand h1{font-size:90px}.title-prologue{font-size:17px}.title-menu{width:360px}.title-menu-button{min-height:56px}.title-continue{min-height:76px}}
+@media(max-height:800px) and (min-width:761px){.title-screen{padding-top:25px;padding-bottom:25px}.title-emblem{width:64px;height:64px}.title-brand h1{font-size:60px}.title-kicker{margin:12px 0 8px;font-size:10px}.title-prologue{font-size:14px;margin-top:18px}.title-rule{margin:16px auto}.title-menu{gap:7px}.title-menu-button{min-height:45px;padding:10px 30px}.title-continue{min-height:63px}.title-menu-label{font-size:18px}.title-music{margin-top:18px}.title-save-hint{margin-top:8px}}
+@media(max-width:900px){.title-screen{padding-left:35px;padding-right:35px}.title-content{width:min(520px,100%)}.title-shade{background:linear-gradient(90deg,#171715ed,#211b18cd 45%,#11191535),linear-gradient(0deg,#111816ce,transparent 45%,#16181570)}.title-side-seal{right:28px;bottom:30px}}
+@media(max-width:760px){.title-screen{padding:30px 27px;justify-items:center}.title-content{width:100%;max-width:440px;justify-self:center}.title-landscape{background-position:60% center;filter:brightness(.48) saturate(.6) contrast(1.08)}.title-shade{background:linear-gradient(#1717159e,#211b18cc 30%,#171715c9 80%,#111816e8)}.title-screen::before{inset:12px}.title-emblem{width:68px;height:68px}.title-brand h1{font-size:54px;letter-spacing:.12em;text-indent:.12em}.title-kicker{font-size:9px;letter-spacing:3px;margin:14px 0 10px}.title-prologue{font-size:13px;letter-spacing:0;margin:21px -8px 0;line-height:2.15}.title-rule{margin:19px auto}.title-menu{max-width:300px}.title-menu-label{font-size:19px}.title-menu-button{min-height:48px}.title-continue{min-height:67px}.title-menu-button small{font-size:9px}.title-music{margin-top:21px}.title-save-hint{font-size:9px;letter-spacing:0;margin:12px 0 0}.title-side-seal{display:none}}
+@media(max-width:370px){.title-screen{padding:25px 23px}.title-brand h1{font-size:46px}.title-prologue{font-size:12px}.title-menu-label{font-size:18px}.title-music{gap:11px}.title-save-hint{max-width:230px;margin-left:auto;margin-right:auto}}
+@media(max-height:650px){.title-screen{align-items:start}.title-emblem{width:52px;height:52px}.title-kicker{margin:10px 0 6px}.title-brand h1{font-size:48px}.title-prologue{margin-top:14px}.title-rule{margin:12px auto}.title-menu{gap:6px}.title-menu-button{min-height:42px;padding-top:9px;padding-bottom:9px}.title-continue{min-height:60px}.title-music{margin-top:14px}}

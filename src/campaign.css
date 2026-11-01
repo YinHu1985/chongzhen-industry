@@ -1,0 +1,57 @@
+.game-dock{width:min(1080px,calc(100% - 48px))}.dock-item{min-width:62px}.personnel-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin:0 0 24px}.personnel-heading h3{font:600 24px var(--serif);margin:7px 0 12px;color:#40583a}.personnel-heading p{font-size:12px;line-height:1.8;color:#766747;margin:0}.personnel-heading .eyebrow{font-size:10px;letter-spacing:3px;color:#997642}.personnel-count{font:16px Georgia;color:#9b8454;white-space:nowrap}.personnel-count b{font-size:42px;color:#475c38}.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:20px 0 14px}.section-heading h3{font:600 18px var(--serif);margin:0;color:#465637}.section-heading>span{font-size:11px;line-height:1.6;color:#87744e}.team-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.team-card{background:#f4ecd7;border:1px solid #baac83;padding:17px;box-shadow:0 3px 6px #5b482a09}.team-card>header{display:flex;align-items:center;gap:12px;margin-bottom:20px}.team-card header small{font-size:10px;color:#79835b}.team-card h3{font:600 17px var(--serif);margin:5px 0 0;color:#3c5033}.team-emblem{display:grid;place-items:center;border:1px solid #a9a375;width:37px;height:42px;background:#dce0bf;color:#657448}.team-card.occupied{background:#e9e1cc}.team-card.occupied .team-emblem{background:#ded5bc;color:#8e7e5a}.specialty-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.specialty{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center}.specialty>span{font-size:11px;color:#8e8061}.specialty>b{font:14px Georgia;color:#92825e}.specialty .progress-track{grid-column:1/-1;height:3px}.specialty.strong>span,.specialty.strong>b{color:#47603a}.specialty.strong .progress-track span{background:#516c3a}.team-card>footer{display:flex;align-items:center;justify-content:space-between;gap:9px;border-top:1px solid #c5b99366;padding-top:14px;margin-top:20px;font-size:10px;color:#9c8c67}.team-card footer small{display:block;font-size:9px;color:#97825c}.team-card footer strong{display:block;font:16px Georgia,var(--serif);color:#806239;margin-top:4px}.team-card footer .small-button{padding:7px 11px;white-space:nowrap}.dismiss-team{font-size:10px;color:#925b43}.team-reason{font-size:11px;line-height:1.7;color:#9c634a;margin:10px 0 0}.recruitment-banner{margin:32px 0 17px;padding:18px 20px;background:#dcd7b9;border:1px solid #b6a573;display:flex;gap:20px;justify-content:space-between;align-items:center}.recruitment-banner h3{font:600 20px var(--serif);margin:0 0 8px;color:#52623e}.recruitment-banner p{font-size:11px;line-height:1.7;color:#89764f;margin:0}.recruitment-banner button{display:flex;gap:8px;align-items:center;white-space:nowrap}.recruitment-banner .icon{width:15px;height:15px}.team-card.candidate{background:#ece7d2;border-style:dashed}.recruit-empty{padding:25px;color:#8d7c54}.combat-panel{padding-top:10px}.combat-factors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:18px;padding:24px 18px;border:1px solid #b7a678;background:#e3dec3}.combat-factors>div{text-align:center;min-width:0}.combat-factors small{font-size:11px;color:#88734d}.combat-factors strong{display:block;font:32px Georgia;margin:11px 0;color:#415a35}.combat-factors strong em{font:11px var(--serif);margin-left:5px;font-style:normal;color:#8a7c56}.combat-factors p{font-size:11px;color:#89794e;margin:0;line-height:1.6}.combat-factors .combat-equipment{font:600 19px/1.5 var(--serif);overflow-wrap:anywhere}.front-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}.front-card{padding:17px;background:#f4ead0;border:1px solid #c6ac78}.front-card>div:first-child{display:flex;align-items:center;gap:10px}.front-card h4{font:600 17px var(--serif);margin:0;flex:1;color:#78603c}.front-card strong{font:27px Georgia;color:#805b39}.front-card strong small{font-size:12px;color:#a18a62}.front-card .progress-track{margin:15px 0}.front-card p{font-size:11px;color:#99835c;margin:0}.front-card.ready{background:#dce6c5;border-color:#91a173}.front-card.ready h4,.front-card.ready strong{color:#425d36}.industry-ledger{margin-top:18px;border-top:1px solid #c0ae84;padding-top:15px;color:#6e6847;font-size:12px}.industry-ledger summary{cursor:pointer}.industry-ledger>div{display:grid;grid-template-columns:1fr 1fr;gap:0 25px;padding:10px 0}.industry-ledger p{display:flex;justify-content:space-between;border-bottom:1px solid #c4b79166;padding-bottom:10px;gap:15px}.industry-ledger strong{font-weight:500;color:#4e643b}.team-selection-note{font-size:11px;color:#89744f}.window-rule strong{line-height:1.7}
+@media(max-width:1050px){.team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.game-dock .season-block{padding:12px;min-width:100px}.dock-actions{padding:6px 4px;gap:0}.dock-item{min-width:55px;letter-spacing:0}.game-dock .end-season{width:150px;padding:15px}.personnel-heading h3{font-size:21px}}
+@media(max-width:760px){.game-dock{width:calc(100% - 24px)}.dock-item{min-width:0;font-size:10px}.dock-item .icon{width:20px;height:20px}.team-grid{grid-template-columns:1fr}.personnel-heading{align-items:flex-start}.personnel-heading h3{font-size:19px}.personnel-count b{font-size:30px}.section-heading{display:block}.section-heading>span{display:block;margin-top:8px}.recruitment-banner{display:block;padding:15px}.recruitment-banner button{margin-top:14px}.combat-factors{padding:18px 8px;gap:4px}.combat-factors strong{font-size:23px}.combat-factors small{font-size:10px}.combat-factors .combat-equipment{font-size:14px}.combat-factors p{font-size:9px}.front-grid{grid-template-columns:1fr}.industry-ledger>div{grid-template-columns:1fr}.front-card strong{font-size:24px}}
+.personnel-tabs{display:flex;gap:6px;border-bottom:1px solid #bdae86;padding-bottom:11px;margin-bottom:18px}.personnel-tabs button{border:1px solid transparent;background:transparent;color:#8b7955;padding:10px 18px;font:17px var(--serif)}.personnel-tabs button b{font:11px sans-serif;margin-left:10px;color:#9b8d6c}.personnel-tabs button.selected{border-color:#9ca875;background:#dde3c5;color:#3e5933}.personnel-tabs button:hover{background:#e3dfc4}.personnel-guide{font-size:12px;color:#7d704d;line-height:1.8;margin:0 0 18px}.personnel-tabs+.recruitment-banner{margin-top:0}.personnel-tabs+.recruitment-banner h3{font-size:18px}.personnel-tabs+.recruitment-banner button{min-height:35px}@media(max-width:760px){.personnel-tabs button{padding:9px;font-size:15px}.personnel-tabs button b{font-size:9px;margin-left:5px}.personnel-guide{font-size:11px}}
+
+/* The audience changes the political stakes, while the trial itself stays the same. */
+.trial-modal{max-width:620px;padding:28px 32px}
+.trial-modal .modal-eyebrow{margin-bottom:7px}
+.trial-modal h2{font-size:25px;margin-bottom:16px}
+.trial-summary{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:24px;padding:13px 17px;margin-bottom:18px;border:1px solid #c8b589;background:#e2d7ba}
+.trial-summary .big-probability{font-size:43px;line-height:1.1;color:#687a46}
+.trial-summary .big-probability>span{font-size:22px;margin-left:3px}
+.trial-summary .big-probability small{display:block;font:11px var(--serif);margin-top:9px;color:#8c7950}
+.trial-summary .modal-detail-row{font-size:11px;padding:4px 0}
+.trial-audience{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.trial-audience-choice{display:flex;flex-direction:column;gap:9px;min-width:0;text-align:left;padding:14px;border:1px solid #bfae85;background:#f4e9ce;color:#786b48}
+.trial-choice-title{display:flex;align-items:center;gap:8px}
+.trial-choice-title i{font-size:15px;font-style:normal;color:#ad945b}
+.trial-choice-title strong{font:600 18px var(--serif);letter-spacing:1px}
+.trial-audience-choice>small{font-size:10px;line-height:1.7;color:#94815b}
+.trial-choice-stakes{display:flex;align-items:baseline;gap:12px;border-top:1px solid #baa97555;padding-top:9px;font-size:10px;white-space:nowrap}
+.trial-choice-stakes b{font:18px Georgia,var(--serif);margin-left:3px}
+.trial-choice-stakes em{margin-left:auto;font-size:9px;font-style:normal;opacity:.7}
+.trial-audience-choice:hover{border-color:#8b9159;background:#ebe5c8}
+.trial-audience-choice.is-selected{background:linear-gradient(#435b3d,#304730);border-color:#b19a5d;box-shadow:inset 0 0 0 2px #ccb46b22;color:#f0e5c2}
+.trial-audience-choice.is-selected small{color:#c1c19b}
+.trial-audience-choice.is-selected .trial-choice-title i{color:#debd72}
+.trial-audience-choice.is-selected .trial-choice-stakes{border-color:#c4b57d55}
+.trial-reputation{display:flex;justify-content:space-between;gap:10px;margin:14px 0 9px;font-size:11px;color:#897650}
+.trial-reputation b{font:19px Georgia,var(--serif);color:#6d7548;margin-left:5px}
+.trial-reputation .is-danger,.trial-reputation .is-danger b{color:#9b4b38}
+.modal .trial-risk{font-size:10px;line-height:1.8;margin:0;color:#8b7954}
+.modal .trial-risk.is-fatal{padding:9px 11px;border-left:2px solid #a25c43;background:#b7734310;color:#944c38}
+.trial-modal .modal-actions{margin-top:18px;padding-top:16px}
+.prestige-ending{border-color:#9c6449;background:radial-gradient(ellipse at top right,#a45c3622,transparent 60%),#e8dcc1}
+.prestige-ending h2{color:#783f30}
+.red-pill-seal{display:grid;place-items:center;width:46px;height:51px;border:3px double #d0aa72;background:#823e2c;color:#eddbac;font:27px var(--serif);margin:16px 0}
+.prestige-ending .ending-reason{padding:9px 12px;border-left:2px solid #a3674c;background:#a56c3d10;color:#96553f;font-size:11px}
+.prestige-ending .result-stats strong{color:#914e39}
+@media(max-width:560px){
+ .trial-modal{padding:24px 20px}
+ .trial-modal h2{font-size:22px}
+ .trial-summary{padding:11px 12px;gap:13px;margin-bottom:13px}
+ .trial-summary .big-probability{font-size:35px}
+ .trial-summary .modal-detail-row{font-size:10px;gap:8px}
+ .trial-audience{gap:8px}
+ .trial-audience-choice{padding:11px 9px;gap:7px}
+ .trial-choice-title{gap:5px}
+ .trial-choice-title strong{font-size:15px;letter-spacing:0}
+ .trial-audience-choice>small{font-size:9px}
+ .trial-choice-stakes{gap:7px;font-size:9px}
+ .trial-choice-stakes b{font-size:16px}
+ .trial-choice-stakes em{display:none}
+ .trial-reputation{gap:7px;font-size:10px}
+ .trial-reputation b{font-size:17px;margin-left:3px}
+ .trial-modal .modal-actions .small-button{font-size:10px;padding:10px}
+}
