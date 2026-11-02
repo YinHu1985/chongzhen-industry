@@ -188,6 +188,8 @@ function trialAudience(project,inviteCourt){
  return `<div class="trial-audience" role="group" aria-label="是否邀请群臣观礼">${[[false,'内廷验收','不邀群臣，按常例赏罚。'],[true,'群臣观礼','邀集群臣，威望赏罚加倍。']].map(([invite,title,description])=>{const outcome=getTrialStakes(state,project.id,invite);return `<button class="trial-audience-choice ${inviteCourt===invite?'is-selected':''}" data-action="test-audience" data-id="${invite?'court':'private'}" aria-pressed="${inviteCourt===invite}"><span class="trial-choice-title"><i aria-hidden="true">${inviteCourt===invite?'◉':'○'}</i><strong>${title}</strong></span><small>${description}</small><span class="trial-choice-stakes"><span>成功 <b>+${outcome.prestigeGain}</b></span><span>失败 <b>−${outcome.prestigeLoss}</b></span><em>威望</em></span></button>`;}).join('')}</div><div class="trial-reputation"><span>当前威望 <b>${state.reputation}</b></span><span>成功后 <b>${state.reputation+stakes.prestigeGain}</b></span><span class="${remaining<0?'is-danger':''}">失败后 <b>${remaining}</b></span></div><p class="trial-risk ${remaining<0?'is-fatal':''}">${remaining<0?'本次若失败，威望将跌至负数，群臣进献红丸，本局结束。':'威望低于 0，群臣进献红丸，本局结束。出险可先拨银抢险。'}</p>`;
 }
 function renderModal(){let html='';
+ // Keep an active season report mounted so unrelated renders cannot cancel its counters.
+ if(ui.modal?.type==='settlement'&&ui.settlementAnimated&&modalRoot.querySelector('.season-report-modal'))return;
  stopSettlementAnimation?.();stopSettlementAnimation=null;
  if(ui.turnTransition){html=renderTurnTransition(ui.turnTransition);}
  else if(ui.modal?.type==='settlement'&&ui.modal.report){html=modalShell(renderTurnSummary(ui.modal.report,{animate:!ui.settlementAnimated}),false,'season-report-modal');}
@@ -200,8 +202,30 @@ function renderModal(){let html='';
  else if(ui.modal?.type==='test'){const p=getProjectInfo(state,ui.modal.id),inviteCourt=ui.modal.inviteCourt===true;html=modalShell(`<p class="modal-eyebrow">工部呈报 · 择机验收</p><h2 id="modal-title">${esc(p.name)}</h2><div class="trial-summary"><div class="big-probability">${p.successChance}<span>%</span><small>验收成功率</small></div><div><div class="modal-detail-row"><span>准备度</span><strong>${p.progress}%</strong></div><div class="modal-detail-row"><span>验收支出</span><strong>${silver(p.testCost)} 两</strong></div><div class="modal-detail-row"><span>抢险预留</span><strong>${silver(p.rescueCost)} 两</strong></div></div></div>${trialAudience(p,inviteCourt)}<div class="modal-actions"><button class="small-button" data-action="modal-close">继续准备</button><button class="small-button primary" data-action="test-now" data-id="${p.id}" ${p.canTest?'':'disabled'}>${inviteCourt?'邀群臣，开始验收':'开始验收'} · ${silver(p.testCost)} 两</button></div>`,true,'trial-modal');}
  else if(ui.modal?.type==='report'){html=modalShell(`<p class="modal-eyebrow">第 ${state.turn} 季 · 御前回报</p><h2 id="modal-title">本次行动已记入卷宗。</h2><p class="result-copy">${esc(ui.modal.text)}</p><div class="modal-actions"><button class="small-button primary" data-action="modal-close">朕知道了</button></div>`);}
  else if(ui.modal?.type==='final-confirm'){html=modalShell(`<p class="modal-eyebrow">最后一季</p><h2 id="modal-title">京师风急，尚可一搏。</h2><p>本季仍可完成科技、操演与调整驻军。结束本季将先结算交战、战损与补充，再按三条战线的敌军数量及持续剿灭能力判定胜利、僵持或失败。</p><div class="modal-detail"><p>${getCombatRating(state).fronts.map(front=>`${esc(front.name)}：敌 ${num(front.troops)} 人，平定线 ${num(front.victoryThreshold)} 人`).join('；')}</p></div><div class="modal-actions"><button class="small-button" data-action="modal-close">继续本季准备</button><button class="small-button danger" data-action="final-now">结束最后一季</button></div>`);}
- modalRoot.innerHTML=html;app.inert=Boolean(html);if(html)requestAnimationFrame(()=>modalRoot.querySelector('.modal,.turn-ceremony')?.focus({preventScroll:true}));
+ const next=document.createElement('template');next.innerHTML=html;
+ const currentDialog=modalRoot.querySelector('.modal-backdrop > .modal'),nextDialog=next.content.querySelector('.modal-backdrop > .modal');
+ // Consecutive dialogs share their shell: replaying the backdrop's entry animation flashes the whole screen.
+ if(currentDialog&&nextDialog){
+  currentDialog.className=nextDialog.className;
+  if(currentDialog.innerHTML!==nextDialog.innerHTML)currentDialog.innerHTML=nextDialog.innerHTML;
+  currentDialog.scrollTop=0;markupCache.delete(modalRoot);
+ }
+ else syncMarkup(modalRoot,html);
+ app.inert=Boolean(html);
+ const dialog=modalRoot.querySelector('.modal,.turn-ceremony');
+ if(dialog&&!dialog.contains(document.activeElement))dialog.focus({preventScroll:true});
  if(ui.modal?.type==='settlement'&&ui.modal.report&&!ui.settlementAnimated){ui.settlementAnimated=true;stopSettlementAnimation=animateTurnSummary(modalRoot,{reducedMotion:reducedMotion()});}
+}
+function updateTrialAudience(){
+ const project=getProjectInfo(state,ui.modal.id),inviteCourt=ui.modal.inviteCourt===true;
+ const next=document.createElement('template');next.innerHTML=trialAudience(project,inviteCourt);
+ for(const choice of modalRoot.querySelectorAll('[data-action="test-audience"]')){
+  const selected=(choice.dataset.id==='court')===inviteCourt;
+  choice.classList.toggle('is-selected',selected);choice.setAttribute('aria-pressed',String(selected));
+  choice.querySelector('i').textContent=selected?'◉':'○';
+ }
+ for(const selector of ['.trial-reputation','.trial-risk'])patchPart(modalRoot.querySelector(selector),next.content.querySelector(selector));
+ modalRoot.querySelector('[data-action="test-now"]').textContent=`${inviteCourt?'邀群臣，开始验收':'开始验收'} · ${silver(project.testCost)} 两`;
 }
 function openPanel(panel){
  if(!panels[panel])return;
@@ -252,7 +276,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
  else if(command==='build'){act('build',{id});}
  else if(command==='train'){act('train',{branch:id});}
  else if(command==='test-confirm'||command==='test'){ui.modal={type:'test',id,inviteCourt:false};renderModal();}
- else if(command==='test-audience'&&ui.modal?.type==='test'){ui.modal.inviteCourt=id==='court';renderModal();requestAnimationFrame(()=>modalRoot.querySelector(`[data-action="test-audience"][data-id="${id}"]`)?.focus({preventScroll:true}));}
+ else if(command==='test-audience'&&ui.modal?.type==='test'){ui.modal.inviteCourt=id==='court';updateTrialAudience();}
  else if(command==='test-now'){act('test',{id,inviteCourt:ui.modal?.inviteCourt===true},true);}
  else if(command==='rescue-accept'||command==='rescue-decline'){act('rescue',{accept:command==='rescue-accept'},true);}
  else if(command==='event-choice'){act('event',{choice:id},true);}
