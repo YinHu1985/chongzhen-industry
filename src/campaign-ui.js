@@ -25,8 +25,14 @@ export function teamsPage(state, tab = 'roster') {
     ${recruiting?`<div class="recruitment-banner"><div><h3>招贤榜</h3><p>征召更换整份名单；雇佣时另付聘银，入署即可派遣。</p></div><button class="small-button primary" data-action="refresh-candidates" ${info.canRefresh?'':'disabled'}>${icon('restart')} 招募新名单 · ${silver(info.refreshCost)} 两</button></div>${!info.canRefresh?`<p class="team-reason">${esc(info.refreshReason)}</p>`:''}<div class="team-grid candidate-grid">${info.candidates.map(team=>teamCard(team,true,info)).join('')||'<p class="recruit-empty">当前名单已无候选，可拨银再开招贤榜。</p>'}</div>`:`<p class="personnel-guide">洋务助起步，数理攻难关，管理成规模。研究指令持续执行，其余差事每队每季一项；解雇损失 ${info.dismissPrestigeCost} 点威望。</p><div class="team-grid">${info.teams.map(team=>teamCard(team,false,info)).join('')}</div>`}`;
 }
 
-export function enemyStrengthSelector(value = 3) {
-  return `<label class="enemy-strength-setting"><span>敌军战斗力</span><select name="enemyStrength" data-enemy-strength aria-label="敌军战斗力系数">${Array.from({length:10}, (_, index) => index + 1).map(level => `<option value="${level}" ${level === value ? 'selected' : ''}>${level} / 10 · ×${(.4 + (level - 1) * .15).toFixed(2)}${level === 3 ? ' · 默认' : ''}</option>`).join('')}</select><small>仅调整敌军单兵战斗力，数值越高，持续剿灭越艰难。开局后固定。</small></label>`;
+export function enemyStrengthSelector(value = 1) {
+  const numeric = Number(value);
+  const strength = Math.min(10, Math.max(.1, Number.isFinite(numeric) ? numeric : 1)).toFixed(2);
+  return `<section class="enemy-strength-setting" aria-labelledby="enemy-strength-label">
+    <div class="enemy-strength-heading"><span id="enemy-strength-label">敌军战斗力系数</span><output for="enemy-strength-range enemy-strength-number" data-enemy-strength-output aria-live="polite">×${strength}</output></div>
+    <div class="enemy-strength-controls"><div class="enemy-strength-slider"><input id="enemy-strength-range" type="range" min="0.10" max="10.00" step="0.01" value="${strength}" data-enemy-strength aria-label="敌军战斗力系数" aria-describedby="enemy-strength-hint"><div class="enemy-strength-scale" aria-hidden="true"><span>0.10</span><span>10.00</span></div></div><label class="enemy-strength-exact" for="enemy-strength-number"><span>精确数值</span><input id="enemy-strength-number" name="enemyStrength" type="number" min="0.10" max="10.00" step="0.01" value="${strength}" inputmode="decimal" data-enemy-strength-number aria-label="敌军战斗力系数精确数值" aria-describedby="enemy-strength-hint" required></label></div>
+    <small id="enemy-strength-hint">1.00 为基准，10.00 为十倍。每次可调整 0.01，仅影响敌军单兵战斗力；开局后固定。</small>
+  </section>`;
 }
 
 function battleFigures(battle, previous = false) {
@@ -57,7 +63,7 @@ function frontCard(front, state) {
 
 export function combatPanel(state) {
   const rating = getCombatRating(state);
-  return `<section class="combat-panel"><div class="section-heading"><h3>持续剿灭 · ${esc(rating.doctrine.name)}</h3><span>敌军战斗力 ${rating.enemyStrength} / 10 · ×${(.4 + (rating.enemyStrength - 1) * .15).toFixed(2)}</span></div>
+  return `<section class="combat-panel"><div class="section-heading"><h3>持续剿灭 · ${esc(rating.doctrine.name)}</h3><span>敌军战斗力 ×${rating.enemyMultiplier.toFixed(2)}</span></div>
     <div class="combat-factors war-supply"><div><small>我军总兵力</small><strong>${number(rating.totalTroops)}<em>人</em></strong><p>预备兵 ${number(rating.reserve)} 人，可调往任一已出现战线</p></div><div><small>工业 · 每季新增补充</small><strong>+${number(rating.reinforcements)}<em>人</em></strong><p>各线共用；持续战损超过补充，军队将逐渐萎缩</p></div><div><small>主力装备 · 训练 ${number(rating.training)} / 100</small><strong class="combat-equipment">${esc(rating.equipmentName)}</strong><p>炮兵：${esc(rating.artilleryName)}</p></div></div>
     <p class="front-support-note">${rating.hasArtillery ? '炮兵配套齐备' : '炮兵配套未齐'} · ${rating.hasCavalry ? '骑兵配套齐备' : '骑兵配套未齐'}。成套装备与对应兵种操练共同决定配套是否生效。</p>
     ${rating.fronts.length ? `<p class="front-orders-guide">下达军令后，驻军每季自动剿灭并补向目标人数。提高目标会调入预备兵，降低目标会撤回多余兵力；兵源不足时等待后续补充。补员优先弥补本季战损，剩余再填驻军缺口；预备兵可暂时补足。</p><div class="warfront-grid">${rating.fronts.map(front => frontCard(front,state)).join('')}</div>` : `<div class="war-peace"><span>${icon('shield')}</span><h4>边境暂宁，先修内功。</h4><p>当前尚无敌军出现。研究工艺、储备兵员与组织操演，为后续战事做准备；收到军报后即可部署部队。</p></div>`}

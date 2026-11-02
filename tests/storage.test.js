@@ -20,6 +20,7 @@ function toLegacy(current) {
 function toV5(current) {
   const state = structuredClone(current);
   state.version = 5; delete state.treasury; delete state.lastSettlement;
+  state.enemyStrength = Math.round((current.enemyStrength - .4) / .15) + 1;
   return state;
 }
 function legacyState(turn = 1) {
@@ -28,7 +29,7 @@ function legacyState(turn = 1) {
 }
 
 function roundTrip(state) {
-  assert.equal(isValidState(state), true, `valid v6 state rejected at turn ${state.turn}`);
+  assert.equal(isValidState(state), true, `valid v7 state rejected at turn ${state.turn}`);
   assert.deepEqual(parseSave(JSON.stringify(state)), state);
   assert.deepEqual(parseSave(JSON.stringify({ state, savedAt: '2026-11-01T00:00:00.000Z' })), state);
   return state;
@@ -58,10 +59,10 @@ function rescueFixture(inviteCourt = false) {
   throw new Error('No recoverable trial found');
 }
 
-test('v6 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
+test('v7 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
   for (const maxTurns of [24, 40, 64]) for (const doctrine of ['cold', 'cuirassier', 'minie', 'breech']) {
     let state = roundTrip(createGame({ maxTurns, seed: 12345 }));
-    assert.equal(state.version, 6);
+    assert.equal(state.version, 7);
     assert.equal(state.teams.length, 5);
     assert.equal(state.candidates.length, 3);
     assert.ok(!Object.hasOwn(state, 'routes') && !Object.hasOwn(state, 'usedTeams'));
@@ -150,7 +151,7 @@ test('legacy pending crises migrate without spending funds or prestige or advanc
     { id: 'ignore', label: '暂缓', description: '待议', cost: 0, disabled: false },
   ] };
   const migrated = parseSave(JSON.stringify(old));
-  assert.equal(migrated.version, 6); assert.equal(migrated.turn, 6);
+  assert.equal(migrated.version, 7); assert.equal(migrated.turn, 6);
   assert.equal(migrated.money, old.money); assert.equal(migrated.reputation, old.reputation);
   assert.equal(migrated.pending, null); assert.deepEqual(migrated.plannedEvents, []);
   assert.deepEqual(migrated.resolvedEvents, []); assert.equal(migrated.warfare.fronts.wokou.troops > 0, true);
@@ -301,7 +302,7 @@ test('pending decisions cannot reference unrelated projects or resurrect old eve
 });
 
 test('unsupported versions and malformed or oversized imports are rejected', () => {
-  for (const version of [1, 2, 3, 7]) {
+  for (const version of [1, 2, 3, 8]) {
     const state = createGame(); state.version = version;
     const before = structuredClone(state);
     assert.equal(isValidState(state), false);
@@ -388,7 +389,7 @@ test('deployed armies, automatic targets, enemy caps and battle reports round-tr
 test('invalid difficulty, dormant deployments, enemy bounds and malformed battle reports are rejected', () => {
   const mutations = [
     state => { state.enemyStrength = 0; }, state => { state.enemyStrength = 11; },
-    state => { state.enemyStrength = 1.5; }, state => { state.enemyStrength = '3'; },
+    state => { state.enemyStrength = 1.555; }, state => { state.enemyStrength = '3'; },
     state => { state.warfare.reserve = -1; }, state => { state.warfare.reserve = Infinity; },
     state => { state.warfare.lastSettledTurn = state.turn + 1; },
     state => { state.warfare.fronts.wokou.target = 2000; },
@@ -452,7 +453,7 @@ test('invalid legacy saves are rejected before migration and rescue decisions re
 
 test('final victory, stalemate and each front-specific ending remain valid after reloading', () => {
   for (const ending of ['won', 'stalemate', 'li', 'qing', 'wokou']) {
-    let state = createGame({ enemyStrength: 3 });
+    let state = createGame({ enemyStrength: .70 });
     state.turn = state.maxTurns;
     state.warfare = createWarfare(state.maxTurns, state.turn);
     state.warfare.reserve = 300000;
@@ -481,7 +482,7 @@ test('final victory, stalemate and each front-specific ending remain valid after
 });
 
 test('a pacified front below its victory line does not invalidate a saved stalemate', () => {
-  let state = createGame({ enemyStrength: 3 });
+  let state = createGame({ enemyStrength: .70 });
   state.turn = state.maxTurns;
   state.warfare = createWarfare(state.maxTurns, state.turn);
   state.warfare.reserve = 200000;
@@ -568,7 +569,7 @@ test('v5 migration preserves money, progress, troop records and occupied teams w
   state = act(state, { type: 'invest', id: 'standards', teamId });
   state = act(state, { type: 'endTurn' });
   const old = toV5(state), restored = parseSave(JSON.stringify({ state: old }));
-  assert.equal(restored.version, 6);
+  assert.equal(restored.version, 7);
   assert.deepEqual(restored.projects, old.projects);
   assert.deepEqual(restored.warfare, old.warfare);
   assert.equal(restored.money, old.money); assert.equal(restored.rng, old.rng);
@@ -639,5 +640,26 @@ test('v5 pending rescue migrates without charging or discarding the unresolved t
     assert.deepEqual(after.projects, expected.projects);
     assert.equal(after.money, expected.money); assert.equal(after.reputation, expected.reputation);
     assert.equal(after.treasury.entries.length, accept ? 1 : 0);
+  }
+});
+
+test('v7 direct multipliers preserve fractional precision through saves and combat settlement', () => {
+  for (const enemyStrength of [.10, .29, .70, 1, 1.15, 2.33, 9.99, 10]) {
+    let state = roundTrip(createGame({ enemyStrength }));
+    assert.equal(state.version, 7); assert.equal(state.enemyStrength, enemyStrength);
+    while (state.turn < 6) state = act(state, { type: 'endTurn' });
+    state = act(state, { type: 'configureFront', id: 'wokou', target: 5000, battleCap: 2500 });
+    const restored = parseSave(JSON.stringify(state));
+    assert.equal(getCombatRating(restored).enemyMultiplier, enemyStrength);
+    assert.deepEqual(getCombatRating(restored), getCombatRating(state));
+    assert.deepEqual(act(restored, { type: 'endTurn' }), act(state, { type: 'endTurn' }));
+  }
+});
+
+test('v7 imports reject out-of-range coefficients and precision finer than hundredths', () => {
+  for (const enemyStrength of [0, .09, .099, .101, 1.001, 1.0000000000000002, 10.001, 11, NaN, Infinity, '1.00', true, null]) {
+    const state = createGame(); state.enemyStrength = enemyStrength;
+    assert.equal(isValidState(state), false, String(enemyStrength));
+    assert.throws(() => parseSave(JSON.stringify(state)));
   }
 });

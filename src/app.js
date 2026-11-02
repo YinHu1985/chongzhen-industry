@@ -2,6 +2,8 @@ import { PROJECTS, FACILITIES, createGame, performAction, getProjectInfo, getTri
 import { loadLocalSave, storeLocalSave, readSaveFile } from './save-slot.js';
 import { renderTitleScreen } from './title-screen.js';
 import { createBackgroundMusic } from './music.js';
+import { createClickSound } from './click-sound.js';
+import { DEFAULT_ENEMY_STRENGTH, MIN_ENEMY_STRENGTH, MAX_ENEMY_STRENGTH, normalizeEnemyStrength } from './warfare.js';
 import { researchBoard, milestonePopup, doctrineSelector, selectResearchTeam, selectResearchTechnology } from './tech-tree.js';
 import { teamsPage, combatPanel, enemyStrengthSelector } from './campaign-ui.js';
 import { settlementScene, facilityArt } from './settlement.js';
@@ -19,15 +21,16 @@ const panels={tech:['天工密录','循里程碑，攀百工之阶'],facilities:
 const branches=['infantry','artillery','cavalry','drill','coordination'];
 const branchIcons={infantry:'swords',artillery:'cannon',cavalry:'horse',drill:'book',coordination:'flag'};
 const branchNames={infantry:'步兵营',artillery:'炮兵营',cavalry:'骑兵营',drill:'军纪与操练',coordination:'诸营协同'};
-function newGame(maxTurns=24,enemyStrength=3){return createGame({maxTurns,enemyStrength,seed:crypto.getRandomValues(new Uint32Array(1))[0]||1});}
+function newGame(maxTurns=24,enemyStrength=DEFAULT_ENEMY_STRENGTH){return createGame({maxTurns,enemyStrength,seed:crypto.getRandomValues(new Uint32Array(1))[0]||1});}
 function loadGame(){
   try { const loaded=loadLocalSave(localStorage);if(loaded){ui.hasGame=true;return loaded;} }
   catch { ui.notice='本地卷宗无法读取。可导入此前导出的存档，或另开新局。'; }
   return newGame();
 }
 let state=loadGame();
-let music=null;
+let music=null,clickSound=null;
 music=createBackgroundMusic({onChange:syncMusicControls});
+clickSound=createClickSound({onChange:syncClickSoundControls});
 const saveFileInput=document.querySelector('#save-file-input');
 let importRequest=0, turnTransitionTimer=null, buildingRevealTimer=null, stopSettlementAnimation=null;
 const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -46,6 +49,23 @@ function syncMusicControls(){
  }
  for(const input of document.querySelectorAll('[data-music-volume]'))if(input!==document.activeElement)input.value=String(Math.round(music.volume*100));
  for(const label of document.querySelectorAll('[data-music-volume-label]'))label.textContent=`${Math.round(music.volume*100)}%`;
+}
+function syncClickSoundControls(){
+ if(!clickSound)return;
+ const label=clickSound.enabled?'点击音效已开启':'点击音效已关闭';
+ for(const button of document.querySelectorAll('[data-action="toggle-click-sound"]')){
+  button.setAttribute('aria-pressed',String(clickSound.enabled));button.setAttribute('aria-label',label);button.title=label;
+  const text=button.querySelector('[data-click-sound-label]');if(text)text.textContent=clickSound.enabled?'音效开':'音效关';
+ }
+ for(const input of document.querySelectorAll('[data-click-sound-volume]'))if(input!==document.activeElement)input.value=String(Math.round(clickSound.volume*100));
+}
+function syncEnemyStrengthControl(input,commit=false){
+ const settings=input?.closest('.enemy-strength-setting');if(!settings)return;
+ const numeric=Number(input.value),range=settings.querySelector('[data-enemy-strength]'),number=settings.querySelector('[data-enemy-strength-number]'),output=settings.querySelector('[data-enemy-strength-output]');
+ if(input.value.trim()===''||!Number.isFinite(numeric)||numeric<MIN_ENEMY_STRENGTH||numeric>MAX_ENEMY_STRENGTH){output.value='请输入 0.10–10.00';return;}
+ const value=normalizeEnemyStrength(numeric).toFixed(2);
+ range.value=value;range.setAttribute('aria-valuetext',`${value} 倍`);output.value=`×${value}`;
+ if(input===range||commit)number.value=value;
 }
 function enterGame(nextState=state){
  clearTimeout(turnTransitionTimer);clearTimeout(buildingRevealTimer);stopSettlementAnimation?.();
@@ -153,8 +173,8 @@ function updateResearchWindow(current,next){
 }
 function render(){
  if(ui.screen==='title'){
-  syncMarkup(app,renderTitleScreen({savedState:ui.hasGame?state:null,notice:ui.storageError||ui.notice,music,icon}));
-  renderedPanel=null;lastSceneKey='';renderModal();syncMusicControls();return;
+  syncMarkup(app,renderTitleScreen({savedState:ui.hasGame?state:null,notice:ui.storageError||ui.notice,music,clickSound,icon}));
+  renderedPanel=null;lastSceneKey='';renderModal();syncMusicControls();syncClickSoundControls();return;
  }
  const scrollSelectors=['.window-content','.research-card-scroll','.research-team-list','.detail-overview','.detail-background'];
  const scrolls=scrollSelectors.map(selector=>[selector,app.querySelector(selector)?.scrollTop||0]);
@@ -196,7 +216,7 @@ function renderModal(){let html='';
  else if(ui.screen==='game'&&state.pending?.kind==='rescue'){const p=state.pending,stakes=getTrialStakes(state,p.projectId,p.inviteCourt===true),fatal=state.reputation-stakes.prestigeLoss<0;html=modalShell(`<p class="modal-eyebrow">${p.inviteCourt?'群臣在场':'内廷试验'} · 待御批</p><h2 id="modal-title">${esc(p.title)}</h2><p>${esc(p.description)}</p><div class="modal-detail"><div class="modal-detail-row"><span>追加经费</span><strong>${silver(p.cost)} 两</strong></div><div class="modal-detail-row"><span>抢险成功率</span><strong>${p.successChance}%</strong></div><div class="modal-detail-row"><span>最终威望变化</span><strong>成功 +${stakes.prestigeGain} / 失败 −${stakes.prestigeLoss}</strong></div></div><p class="trial-risk ${fatal?'is-fatal':''}">${fatal?'此次失利将使威望跌至负数，触发红丸结局。':'威望尚未结算，按最终结果赏罚。'}本次仅有一次抢险机会。</p><div class="modal-actions"><button class="small-button" data-action="rescue-decline">接受失败</button><button class="small-button primary" data-action="rescue-accept" ${state.money<p.cost?'disabled':''}>拨银抢险</button></div>`,false);}
  else if(ui.screen==='game'&&state.pending?.kind==='event'){const p=state.pending;html=modalShell(`<p class="modal-eyebrow">第 ${state.turn} 季 · 兵部急递</p><h2 id="modal-title">${esc(p.title)}</h2><p>${esc(p.description)}</p>${p.choices.map(c=>`<button class="modal-choice" data-action="event-choice" data-id="${c.id}" ${c.disabled?'disabled':''}><span><strong>${esc(c.label)}</strong><small>${esc(c.description)}${c.cost?` · ${silver(c.cost)} 两`:''}</small></span>${icon('chevron')}</button>`).join('')}<p class="shortcut-note">局部战果改变朝廷威望，最后期限始终不变。</p>`,false);}
  else if(ui.screen==='game'&&state.status!=='playing'&&!ui.resultDismissed){const won=state.status==='won',stalemate=state.status==='stalemate',redPill=['prestige','wokou'].includes(state.defeatReason),ending=getCampaignOutcome(state);html=modalShell(`<p class="modal-eyebrow">${getDate(state)} · ${won?'三线平定':stalemate?'国祚暂续':redPill?'丹诏无声':'山河失守'}</p>${won?`<img class="victory-art" src="${technologyArt('joint_trials')}" alt="新军守卫京师" width="640" height="427">`:redPill?'<div class="red-pill-seal" aria-hidden="true">丹</div>':''}<h2 id="modal-title">${esc(ending.title)}</h2><p>${esc(ending.description)}</p>${state.defeatReason==='prestige'?'<p class="ending-reason">朝廷威望低于 0，本局已结束。</p>':''}<div class="ending-fronts">${getCombatRating(state).fronts.map(front=>`<div><span>${esc(front.name)}</span><b>敌余 ${num(front.troops)}</b><small>平定线 ${num(front.victoryThreshold)} · ${front.troops<=front.victoryThreshold?'已压制':front.lastBattle?.sustainable&&front.lastBattle?.enemyDeclining?'可持续压制':'局势未稳'}</small></div>`).join('')}</div><div class="result-stats"><div><span>历经季度</span><strong>${state.turn}</strong></div><div><span>朝廷威望</span><strong>${state.reputation}</strong></div><div><span>建成工场</span><strong>${Object.values(state.facilities).filter(Boolean).length}</strong></div></div><div class="modal-actions"><button class="small-button" data-action="ending-close">回看工场</button><button class="small-button primary" data-action="new-game">另启新局</button></div>`,true,redPill?'prestige-ending':stalemate?'stalemate-ending':'');}
- else if(ui.modal?.type==='new-game'){html=modalShell(`<p class="modal-eyebrow">再借大明几年</p><h2 id="modal-title">另启一卷国运。</h2><p>${ui.hasGame?'新局会替换当前进度，可先导出卷宗留存。':'选择敌军强度与期限，从今日开始逆天改命。'}</p>${enemyStrengthSelector()}${[[24,'最后六年','崇祯十一年夏'],[40,'再借十年','崇祯七年夏'],[64,'从头整顿','崇祯元年夏']].map(([t,n,d])=>`<button class="modal-choice" data-action="start-game" data-id="${t}"><span><strong>${n} · ${t}季</strong><small>${d}起，至崇祯十七年春</small></span>${icon('arrow')}</button>`).join('')}${ui.hasGame?'<button class="text-button" data-action="export">先导出当前卷宗</button>':''}`);}
+ else if(ui.modal?.type==='new-game'){html=modalShell(`<p class="modal-eyebrow">再借大明几年</p><h2 id="modal-title">另启一卷国运。</h2><p>${ui.hasGame?'新局会替换当前进度，可先导出卷宗留存。':'选择敌军强度与期限，从今日开始逆天改命。'}</p>${enemyStrengthSelector()}${[[24,'最后六年','崇祯十一年夏'],[40,'再借十年','崇祯七年夏'],[64,'从头整顿','崇祯元年夏']].map(([t,n,d])=>`<button class="modal-choice" data-action="start-game" data-id="${t}"><span><strong>${n} · ${t}季</strong><small>${d}起，至崇祯十七年春</small></span>${icon('arrow')}</button>`).join('')}${ui.hasGame?'<button class="text-button" data-action="export">先导出当前卷宗</button>':''}`,true,'new-game-modal');}
  else if(ui.modal?.type==='import-save'&&ui.pendingImport){const imported=ui.pendingImport.state;html=modalShell(`<p class="modal-eyebrow">读取卷宗</p><h2 id="modal-title">接续这一卷国运。</h2><p>${esc(ui.pendingImport.name)}</p><div class="modal-detail"><div class="modal-detail-row"><span>时日</span><strong>${esc(getDate(imported))}</strong></div><div class="modal-detail-row"><span>历经季度</span><strong>第 ${imported.turn} / ${imported.maxTurns} 季</strong></div><div class="modal-detail-row"><span>内库银两</span><strong>${silver(imported.money)} 两</strong></div></div><p>${ui.hasGame?'读取后将替换当前本地进度。':'卷宗已核验，可继续其中的征程。'}</p><div class="modal-actions">${ui.hasGame?'<button class="text-button" data-action="export">先导出当前卷宗</button>':''}<button class="small-button" data-action="modal-close">暂不读取</button><button class="small-button primary" data-action="confirm-import">读取此卷宗</button></div>`);}
  else if(ui.modal?.type==='dismiss-team'){const team=state.teams.find(t=>t.id===ui.modal.id),cost=getRecruitmentInfo(state).dismissPrestigeCost;html=modalShell(`<p class="modal-eyebrow">人事更替</p><div class="team-dismiss-heading">${teamPortrait(team,'large')}<h2 id="modal-title">遣散${esc(team?.name)}？</h2></div><p>损失 ${cost} 点朝廷威望，每季拨款减少 ${silver(cost*200)} 两。已付聘银不退还。</p>${state.reputation<cost?'<p class="trial-risk is-fatal">解雇后威望将低于 0，群臣进献红丸，本局结束。</p>':''}<div class="modal-actions"><button class="small-button" data-action="modal-close">暂且留任</button><button class="small-button danger" data-action="dismiss-team-confirm" data-id="${esc(team?.id)}">确定解雇</button></div>`);}
  else if(ui.modal?.type==='test'){const p=getProjectInfo(state,ui.modal.id),inviteCourt=ui.modal.inviteCourt===true;html=modalShell(`<p class="modal-eyebrow">工部呈报 · 择机验收</p><h2 id="modal-title">${esc(p.name)}</h2><div class="trial-summary"><div class="big-probability">${p.successChance}<span>%</span><small>验收成功率</small></div><div><div class="modal-detail-row"><span>准备度</span><strong>${p.progress}%</strong></div><div class="modal-detail-row"><span>验收支出</span><strong>${silver(p.testCost)} 两</strong></div><div class="modal-detail-row"><span>抢险预留</span><strong>${silver(p.rescueCost)} 两</strong></div></div></div>${trialAudience(p,inviteCourt)}<div class="modal-actions"><button class="small-button" data-action="modal-close">继续准备</button><button class="small-button primary" data-action="test-now" data-id="${p.id}" ${p.canTest?'':'disabled'}>${inviteCourt?'邀群臣，开始验收':'开始验收'} · ${silver(p.testCost)} 两</button></div>`,true,'trial-modal');}
@@ -246,6 +266,13 @@ function resetDetailScroll(){for(const selector of ['.detail-overview','.detail-
 function closeMilestone(){const closed=ui.milestoneSelection;ui.milestoneSelection=null;render();app.querySelector(`.milestone-item[data-id="${CSS.escape(closed||'')}"]`)?.focus({preventScroll:true});}
 function exportSave(){const url=URL.createObjectURL(new Blob([JSON.stringify({state,savedAt:new Date().toISOString()},null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`崇祯工业-v${state.version}-第${state.turn}季.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('卷宗已导出。');}
 
+// Listen before UI actions replace their buttons, including form submissions and keyboard clicks.
+document.addEventListener('click',event=>{
+ const button=event.target.closest('button,[role="button"],summary');
+ if(!button||button.matches(':disabled,[aria-disabled="true"]')||button.closest('[inert]')||ui.turnTransition)return;
+ if(ui.modal?.type==='settlement'&&!button.closest('.season-report-modal'))return;
+ if(button.dataset.action!=='toggle-click-sound')void clickSound.play();
+},{capture:true});
 document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(!button||button.disabled||ui.turnTransition)return;const command=button.dataset.action,id=button.dataset.id;
  if(ui.modal?.type==='settlement'&&command!=='settlement-continue')return;
  if(command==='continue-game'){if(ui.hasGame)enterGame();}
@@ -253,6 +280,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
  else if(command==='load-save'){importRequest++;saveFileInput.value='';saveFileInput.click();}
  else if(command==='confirm-import'){if(ui.pendingImport){const imported=ui.pendingImport.state;enterGame(imported);save();render();toast('卷宗已载入。');}}
  else if(command==='toggle-music'){music.toggle();}
+ else if(command==='toggle-click-sound'){clickSound.toggle();void clickSound.play();}
  else if(command==='nav'||command==='open-panel'){openPanel(button.dataset.panel||id);}
  else if(command==='home'||command==='window-close'){ui.panel=null;render();}
  else if(command==='dismiss-notice'){ui.notice='';ui.storageError='';render();}
@@ -285,7 +313,12 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
  else if(command==='settlement-continue'){stopSettlementAnimation?.();stopSettlementAnimation=null;ui.modal=null;render();}
  else if(command==='modal-close'||command==='ending-close'){if(ui.screen==='game'&&state.pending)return;ui.modal=null;ui.pendingImport=null;ui.resultDismissed=true;renderModal();}
  else if(command==='new-game'){importRequest++;ui.pendingImport=null;ui.resultDismissed=true;ui.modal={type:'new-game'};render();}
- else if(command==='start-game'){if(![24,40,64].includes(Number(id)))return;const enemyStrength=Number(modalRoot.querySelector('[data-enemy-strength]')?.value||3);enterGame(newGame(Number(id),enemyStrength));save();render();toast('新局已启。招贤理工，循阶救亡。');}
+ else if(command==='start-game'){
+  if(![24,40,64].includes(Number(id)))return;
+  const input=modalRoot.querySelector('[data-enemy-strength-number]');if(!input)return;
+  syncEnemyStrengthControl(input,true);if(!input.reportValidity())return;
+  enterGame(newGame(Number(id),Number(input.value)));save();render();toast('新局已启。招贤理工，循阶救亡。');
+ }
  else if(command==='export'){exportSave();}
  else if(command==='ending'){ui.resultDismissed=false;ui.modal=null;render();}
 });
@@ -299,7 +332,16 @@ saveFileInput.addEventListener('change',async()=>{
 });
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('[data-action="toggle-music"]'))music.unlock();},{capture:true});
 document.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)&&!event.target.closest('[data-action="toggle-music"]'))music.unlock();},{capture:true});
-document.addEventListener('input',event=>{if(event.target.matches('[data-music-volume]'))music.setVolume(Number(event.target.value)/100);});
+document.addEventListener('input',event=>{
+ if(event.target.matches('[data-music-volume]'))music.setVolume(Number(event.target.value)/100);
+ else if(event.target.matches('[data-click-sound-volume]'))clickSound.setVolume(Number(event.target.value)/100);
+ else if(event.target.matches('[data-enemy-strength],[data-enemy-strength-number]'))syncEnemyStrengthControl(event.target);
+});
+document.addEventListener('change',event=>{
+ if(event.target.matches('[data-enemy-strength],[data-enemy-strength-number]'))syncEnemyStrengthControl(event.target,true);
+ else if(event.target.matches('[data-click-sound-volume]'))void clickSound.play();
+});
+document.addEventListener('focusout',event=>{if(event.target.matches('[data-enemy-strength-number]'))syncEnemyStrengthControl(event.target,true);});
 document.addEventListener('submit',event=>{if(ui.turnTransition||ui.modal?.type==='settlement'){event.preventDefault();return;}if(event.target.matches('[data-front-orders]')){event.preventDefault();const form=event.target;if(!form.reportValidity())return;const values=new FormData(form);act('configureFront',{id:form.dataset.frontOrders,target:Number(values.get('target')),battleCap:Number(values.get('battleCap'))});return;}if(event.target.id!=='tech-search')return;event.preventDefault();ui.techQuery=String(new FormData(event.target).get('query')||'').trim();render();});
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&(ui.turnTransition||ui.modal?.type==='settlement')){event.preventDefault();return;}

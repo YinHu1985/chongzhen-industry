@@ -1,7 +1,7 @@
 /** Deterministic, immutable, JSON-serializable industrial campaign. */
 import {PROJECTS,TECH_ERAS,TECH_BRANCHES,ROUTES,FACILITIES,TECH_CATEGORIES,MILESTONES,SPECIALTIES,DOCTRINES,FAMILIES} from './technology.js';
 export {PROJECTS,TECH_ERAS,TECH_BRANCHES,ROUTES,FACILITIES,TECH_CATEGORIES,MILESTONES,SPECIALTIES,DOCTRINES,FAMILIES};
-import {FRONTS,createWarfare,activateFronts,getWarfareRating,configureFront,settleWarfare,evaluateCampaign,campaignOutcome} from './warfare.js';
+import {FRONTS,createWarfare,activateFronts,getWarfareRating,configureFront,settleWarfare,evaluateCampaign,campaignOutcome,normalizeEnemyStrength,DEFAULT_ENEMY_STRENGTH} from './warfare.js';
 export {FRONTS} from './warfare.js';
 export const getCampaignOutcome=campaignOutcome;
 const PM=Object.fromEntries(PROJECTS.map(p=>[p.id,p])), FM=Object.fromEntries(FACILITIES.map(f=>[f.id,f]));
@@ -55,10 +55,10 @@ function makeTeam(s,index,initial=false){
  const name=initial?teamNames[index]:`${['江南','登莱','京师','西洋','两浙','山陕'][Math.floor(random(s)*6)]}${SPECIALTIES.find(sp=>sp.id===specialty).name}研习社 ${s.recruitmentRound+1}-${index+1}`;
  return {id,name,specialties:strengths,usedTurn:0,activity:null,hireCost:Math.round((4000+Object.values(strengths).reduce((a,b)=>a+b,0)*12)/100)*100};
 }
-export function createGame({maxTurns=24,seed=12345,enemyStrength=3}={}){
+export function createGame({maxTurns=24,seed=12345,enemyStrength=DEFAULT_ENEMY_STRENGTH}={}){
  maxTurns=Math.max(4,Math.floor(Number(maxTurns)||24));const safeSeed=(Number(seed)>>>0)||12345;
- enemyStrength=Number.isFinite(Number(enemyStrength))?clamp(Math.round(Number(enemyStrength)),1,10):3;
- const s={version:6,treasury:{entries:[],nextId:1},lastSettlement:null,enemyStrength,warfare:createWarfare(maxTurns),maxTurns,turn:1,seed:safeSeed,rng:safeSeed,money:35000,reputation:10,doctrine:'cold',teams:[],candidates:[],nextTeamId:1,recruitmentRound:0,
+ enemyStrength=normalizeEnemyStrength(enemyStrength);
+ const s={version:7,treasury:{entries:[],nextId:1},lastSettlement:null,enemyStrength,warfare:createWarfare(maxTurns),maxTurns,turn:1,seed:safeSeed,rng:safeSeed,money:35000,reputation:10,doctrine:'cold',teams:[],candidates:[],nextTeamId:1,recruitmentRound:0,
  projects:Object.fromEntries(PROJECTS.map(p=>[p.id,{progress:0,completed:false,investedTurn:0,testedTurn:0,attempts:0}])),facilities:Object.fromEntries(FACILITIES.map(f=>[f.id,0])),army:{infantry:0,cavalry:0,artillery:0,drill:0,coordination:0},trainedTurn:{},plannedEvents:[],resolvedEvents:[],pending:null,log:[],nextLogId:1,status:'playing',stats:{investments:0,researchSuccesses:0,researchSetbacks:0,tests:0,successes:0,failures:0,rescues:0,rescued:0,battles:0,battleWins:0,supplies:0,spent:0,earned:0}};
  s.teams=Array.from({length:5},(_,i)=>makeTeam(s,i,true));s.candidates=Array.from({length:3},(_,i)=>makeTeam(s,i));
  addLog(s,'工部开局',`距最后期限还有${maxTurns}季。让团队推进工业、整备新军；敌情出现后调兵持续剿灭，以补员支撑战损。`);return s;
@@ -188,7 +188,7 @@ function finishTurn(s){
  s.lastSettlement=report;return message;
 }
 export function performAction(original,action){
- const fail=message=>({state:original,message,error:message});if(!original||original.version!==6)return fail('存档版本不兼容。');if(!action||typeof action.type!=='string')return fail('未知操作。');if(original.status!=='playing')return fail('本局已经结束。');if(original.pending&&!((original.pending.kind==='rescue'&&action.type==='rescue')||(original.pending.kind==='event'&&action.type==='event')))return fail('请先处理当前决策。');if(action.type==='endTurn'){const budget=getFinanceInfo(original);if(budget.shortfall)return fail(`内库不足以支付本季指令：需${budget.expenses}两，现有${original.money}两，尚缺${budget.shortfall}两。请取消研究目标或在财政界面劝输助饷。`);}
+ const fail=message=>({state:original,message,error:message});if(!original||original.version!==7)return fail('存档版本不兼容。');if(!action||typeof action.type!=='string')return fail('未知操作。');if(original.status!=='playing')return fail('本局已经结束。');if(original.pending&&!((original.pending.kind==='rescue'&&action.type==='rescue')||(original.pending.kind==='event'&&action.type==='event')))return fail('请先处理当前决策。');if(action.type==='endTurn'){const budget=getFinanceInfo(original);if(budget.shortfall)return fail(`内库不足以支付本季指令：需${budget.expenses}两，现有${original.money}两，尚缺${budget.shortfall}两。请取消研究目标或在财政界面劝输助饷。`);}
  const s=clone(original);let message='';
  if(action.type==='configureFront'){const error=configureFront(s,action);if(error)return fail(error);const front=getCombatRating(s).fronts.find(front=>front.id===action.id);message=`${front.name}驻军目标${front.target}人，现有${front.assigned}人；敌军每季参战上限${front.battleCap}人。驻军每季自动剿灭，空缺按兵源补齐。`;addLog(s,'战线部署',message);}
  else if(action.type==='selectDoctrine'||action.type==='selectRoute'){const id=action.id||action.routeId;if(!DOCTRINES.some(d=>d.id===id))return fail('未知作战方略。');s.doctrine=id;message=`采用${DOCTRINES.find(d=>d.id===id).name}；已成成果保留，装备自动选用同类最高成套制式。`;addLog(s,'作战方略',message);}

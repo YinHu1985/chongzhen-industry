@@ -26,8 +26,8 @@ const PLANS = {
 
 // Finance every building, research attempt, trial and training session through
 // public actions. No completed technologies, funds, teams or progress are injected.
-export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,deployFronts=null,deferProject=null,deferUntil=0}={}) {
-  let state=createGame({seed,maxTurns}), beforeDeferredTest=null;
+export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStrength=1,onAction,deployFronts=null,deferProject=null,deferUntil=0}={}) {
+  let state=createGame({seed,maxTurns,enemyStrength}), beforeDeferredTest=null;
   const history=[], priorities=PLANS[doctrine];
   if (!priorities) throw new Error(`Unknown campaign ${doctrine}`);
   const take=action=>{

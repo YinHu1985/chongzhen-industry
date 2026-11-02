@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, performAction, getCombatRating, getGoals, getCampaignOutcome, getFinanceInfo, PROJECTS } from '../src/game.js';
-import { FRONTS, createWarfare } from '../src/warfare.js';
+import { FRONTS, createWarfare, strengthMultiplier, isEnemyStrength, normalizeEnemyStrength } from '../src/warfare.js';
 import { act, playCampaign } from './helpers/campaign.mjs';
 
 const ids = ['wokou', 'li', 'qing'];
-function fixture({ turn = 18, maxTurns = 24, enemyStrength = 3, trained = true } = {}) {
+// Preserve the original 0.70× balance for combat fixtures unrelated to difficulty input.
+function fixture({ turn = 18, maxTurns = 24, enemyStrength = .70, trained = true } = {}) {
   const state = createGame({ maxTurns, enemyStrength });
   state.turn = turn;
   state.warfare = createWarfare(maxTurns, turn);
@@ -133,7 +134,7 @@ test('enemy strength settings change combat power and losses, not starting numbe
   assert.ok(hard.forecast.playerLosses > easy.forecast.playerLosses);
   assert.ok(hard.forecast.enemyLosses <= easy.forecast.enemyLosses);
   assert.equal(getCombatRating(states[0]).reinforcements, getCombatRating(states[1]).reinforcements);
-  assert.equal(createGame().enemyStrength, 3);
+  assert.equal(createGame().enemyStrength, 1);
 });
 
 test('missing cavalry and artillery gives the Qing additional combat advantages', () => {
@@ -319,9 +320,9 @@ function plannedDeployment(state) {
   ];
 }
 
-test('the default 24-season cold army campaign survives using financed public actions and recurring deployment', () => {
-  const { state, history } = playCampaign('cold', { deployFronts: plannedDeployment });
-  assert.equal(state.enemyStrength, 3);
+test('the 0.70× 24-season cold army campaign survives using financed public actions and recurring deployment', () => {
+  const { state, history } = playCampaign('cold', { enemyStrength: .70, deployFronts: plannedDeployment });
+  assert.equal(state.enemyStrength, .70);
   assert.ok(['won', 'stalemate'].includes(state.status), 'ongoing research advances at season end, so survival may remain a stalemate in the shortest campaign');
   assert.equal(state.turn, 24);
   assert.ok(history.some(({action}) => action.type === 'configureFront'));
@@ -329,8 +330,33 @@ test('the default 24-season cold army campaign survives using financed public ac
 });
 
 for (const [doctrine, maxTurns] of [['cold', 40], ['minie', 40], ['cuirassier', 40], ['breech', 64]]) test(`a ${maxTurns}-season ${doctrine} campaign can win through public research, training and deployment`, () => {
-  const { state } = playCampaign(doctrine, { maxTurns, deployFronts: plannedDeployment });
+  const { state } = playCampaign(doctrine, { maxTurns, enemyStrength: .70, deployFronts: plannedDeployment });
   assert.equal(state.status, 'won');
   assert.equal(state.turn, maxTurns);
   assert.ok(getGoals(state).every(goal => goal.done));
+});
+
+test('difficulty is the direct 0.10–10.00 multiplier with 1.00 as the default', () => {
+  assert.equal(createGame().enemyStrength, 1);
+  for (const coefficient of [.10, 1, 10]) {
+    const state = fixture({ enemyStrength: coefficient });
+    const rating = getCombatRating(state);
+    assert.equal(state.enemyStrength, coefficient);
+    assert.equal(rating.enemyMultiplier, coefficient);
+    assert.equal(strengthMultiplier(coefficient), coefficient);
+    for (const definition of FRONTS) {
+      assert.equal(front(state, definition.id).enemyPower, definition.power * coefficient);
+    }
+  }
+});
+
+test('new-game coefficients normalize to two decimal places while save validation remains strict', () => {
+  for (const [input, expected] of [[.1, .1], [.29, .29], [1, 1], [1.005, 1.01], [2.345, 2.35], [10, 10], [99, 10], [-1, .1], [NaN, 1], [Infinity, 1]]) {
+    assert.equal(normalizeEnemyStrength(input), expected);
+    assert.equal(createGame({ enemyStrength: input }).enemyStrength, expected);
+    assert.equal(isEnemyStrength(expected), true);
+  }
+  for (const invalid of [0, .09, .101, 1.001, 1.0000000000000002, 10.01, NaN, Infinity, '1.00', null, true]) {
+    assert.equal(isEnemyStrength(invalid), false, String(invalid));
+  }
 });

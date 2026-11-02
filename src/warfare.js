@@ -7,7 +7,14 @@ export const FRONTS = [
 const byId=Object.fromEntries(FRONTS.map(front=>[front.id,front]));
 const priority=['li','qing','wokou'];
 export const frontStartTurn=(maxTurns,front)=>Math.max(1,Math.ceil(maxTurns*front.startFraction));
-export const strengthMultiplier=level=>Math.round((.4+(level-1)*.15)*100)/100;
+export const MIN_ENEMY_STRENGTH=.10,MAX_ENEMY_STRENGTH=10,DEFAULT_ENEMY_STRENGTH=1;
+export const isEnemyStrength=value=>typeof value==='number'&&Number.isFinite(value)&&value>=MIN_ENEMY_STRENGTH&&value<=MAX_ENEMY_STRENGTH&&value===Math.round(value*100)/100;
+export function normalizeEnemyStrength(value=DEFAULT_ENEMY_STRENGTH){
+  const numeric=Number(value);
+  return Number.isFinite(numeric)?Math.round((Math.max(MIN_ENEMY_STRENGTH,Math.min(MAX_ENEMY_STRENGTH,numeric))+Number.EPSILON)*100)/100:DEFAULT_ENEMY_STRENGTH;
+}
+// The setting is the multiplier itself; legacy levels are converted only when loading old saves.
+export const strengthMultiplier=coefficient=>coefficient;
 export function createWarfare(maxTurns,turn=1){
   return {reserve:8000,lastSettledTurn:turn-1,fronts:Object.fromEntries(FRONTS.map(front=>[front.id,{troops:turn>=frontStartTurn(maxTurns,front)?front.initialTroops:0,assigned:0,target:0,battleCap:front.battleCap,lastBattle:null}]))};
 }

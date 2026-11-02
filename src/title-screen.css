@@ -33,6 +33,7 @@
 .title-music-glyph{font:17px/1 Georgia,serif;color:#c7a36b}
 .title-volume{display:flex;align-items:center;gap:7px;font-size:12px}
 .title-volume input{width:88px;height:18px;margin:0;accent-color:#b99760;cursor:pointer}
+.title-music.title-click-sound{margin-top:3px}
 .title-save-hint{margin:12px -10px 0;font-size:12px;line-height:1.8;letter-spacing:.2px;color:#9c8e76}
 .title-side-seal{position:fixed;right:48px;bottom:48px;padding:12px 9px;border:1px solid #a1744d70;color:#b18a68;background:#3d20175c;font:14px/1.9 var(--serif);letter-spacing:4px;writing-mode:vertical-rl;text-shadow:0 1px 3px #20100b}
 @media(min-width:1600px) and (min-height:900px){.title-screen{padding-left:10vw}.title-content{width:600px}.title-emblem{width:102px;height:102px}.title-brand h1{font-size:90px}.title-prologue{font-size:17px}.title-menu{width:360px}.title-menu-button{min-height:56px}.title-continue{min-height:76px}}

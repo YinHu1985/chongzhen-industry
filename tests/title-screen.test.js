@@ -29,3 +29,12 @@ test('title notices are escaped and music controls reflect the supplied preferen
   assert.match(html, /data-music-label>音乐关/);
   assert.match(html, /value="46" data-music-volume/);
 });
+
+test('click sound has separate controls and volume from background music', () => {
+  const html = renderTitleScreen({ music: { enabled: false, volume: .46 }, clickSound: { enabled: true, volume: .72 } });
+  assert.match(html, /data-action="toggle-music" aria-pressed="false"/);
+  assert.match(html, /value="46" data-music-volume/);
+  assert.match(html, /data-action="toggle-click-sound" aria-pressed="true"/);
+  assert.match(html, /value="72" data-click-sound-volume/);
+  assert.match(renderTitleScreen({ clickSound: { enabled: false, volume: 0 } }), /data-click-sound-label>音效关/);
+});

@@ -13,20 +13,35 @@ function advance(state, turn) {
   return state;
 }
 
-test('new-game difficulty exposes every strength from one to ten with a visible multiplier', () => {
+test('new-game difficulty offers precise direct coefficients with matching range, number and output', () => {
   const html = enemyStrengthSelector();
-  assert.equal((html.match(/<option /g) || []).length, 10);
-  assert.match(html, /value="3" selected>3 \/ 10 · ×0\.70/);
-  assert.match(html, /value="1"[^>]*>1 \/ 10 · ×0\.40/);
-  assert.match(html, /value="10"[^>]*>10 \/ 10 · ×1\.75/);
-  assert.match(enemyStrengthSelector(8), /value="8" selected>/);
+  assert.doesNotMatch(html, /<select|<option| \/ 10/);
+  const inputs = [...html.matchAll(/<input\b[^>]+>/g)].map(match => match[0]);
+  assert.equal(inputs.length, 2);
+  assert.match(inputs[0], /type="range"/);
+  assert.match(inputs[0], /data-enemy-strength(?: |>|$)/);
+  assert.match(inputs[1], /type="number"/);
+  assert.match(inputs[1], /data-enemy-strength-number(?: |>|$)/);
+  for (const input of inputs) {
+    assert.match(input, /min="0\.10" max="10\.00" step="0\.01"/);
+    assert.match(input, /value="1\.00"/);
+  }
+  assert.match(html, /data-enemy-strength-output[^>]*>×1\.00<\/output>/);
+  assert.match(html, /1\.00 为基准，10\.00 为十倍/);
+  assert.match(html, /开局后固定/);
+  for (const value of [.1, .37, 1, 2.56, 10]) {
+    const rendered = enemyStrengthSelector(value), label = value.toFixed(2);
+    assert.equal((rendered.match(new RegExp(`value="${label.replace('.', '\\.') }"`, 'g')) || []).length, 2);
+    assert.ok(rendered.includes(`>×${label}</output>`));
+  }
 });
 
 test('prewar screen shows supply preparation without revealing any enemy or orders', () => {
-  const state = createGame({ enemyStrength: 8 });
+  const state = createGame({ enemyStrength: 2.56 });
   const html = combatPanel(state);
   assert.match(html, /边境暂宁/);
-  assert.match(html, /8 \/ 10 · ×1\.45/);
+  assert.match(html, /敌军战斗力 ×2\.56/);
+  assert.doesNotMatch(html, / \/ 10 ·/);
   assert.match(html, /每季新增补充/);
   assert.match(html, /预备兵 8,000 人/);
   assert.doesNotMatch(html, /倭寇|流寇|李自成|清军|data-front-orders|NaN|undefined/);

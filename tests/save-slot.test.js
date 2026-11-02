@@ -55,7 +55,7 @@ test('an existing browser slot migrates v4 in memory without overwriting the sou
     turn: stage * 6, title: '旧军报', description: '地方请求援军。' }));
   const raw = JSON.stringify({ state: legacy });
   const existing = slot(raw), restored = loadLocalSave(existing);
-  assert.equal(restored.version, 6); assert.equal(restored.status, 'playing');
+  assert.equal(restored.version, 7); assert.equal(restored.status, 'playing');
   assert.deepEqual(restored.projects, legacy.projects);
   assert.equal(existing.raw, raw); assert.equal(existing.writes, 0);
   storeLocalSave(existing, restored);
@@ -64,10 +64,11 @@ test('an existing browser slot migrates v4 in memory without overwriting the sou
 
 test('the original browser slot also accepts v5 and starts finance history only after migration', () => {
   const legacy = createGame({ seed: 441 });
-  legacy.version = 5; delete legacy.treasury; delete legacy.lastSettlement;
+  legacy.version = 5; legacy.enemyStrength = 3; delete legacy.treasury; delete legacy.lastSettlement;
   const raw = JSON.stringify({ state: legacy });
   const existing = slot(raw), restored = loadLocalSave(existing);
-  assert.equal(restored.version, 6); assert.equal(restored.money, legacy.money);
+  assert.equal(restored.version, 7); assert.equal(restored.money, legacy.money);
+  assert.equal(restored.enemyStrength, .70);
   assert.deepEqual(restored.treasury, { entries: [], nextId: 1 });
   assert.equal(restored.lastSettlement, null);
   assert.equal(existing.raw, raw); assert.equal(existing.writes, 0);

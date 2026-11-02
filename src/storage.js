@@ -1,4 +1,4 @@
-import { FRONTS, createWarfare } from './warfare.js';
+import { FRONTS, createWarfare, isEnemyStrength } from './warfare.js';
 import { PROJECTS, FACILITIES, createGame, getProjectInfo } from './game.js';
 
 const CAMPAIGN_TEMPLATES = new Map([24, 40, 64].map(maxTurns => [maxTurns, createGame({ maxTurns })]));
@@ -208,7 +208,7 @@ const BATTLE_COUNTS = BATTLE_KEYS.filter(key => !['turn', 'sustainable', 'enemyD
 
 function validWarfare(state) {
   const warfare = state.warfare;
-  if (!integer(state.enemyStrength, 1, 10)
+  if (!(state.version < 7 ? integer(state.enemyStrength, 1, 10) : isEnemyStrength(state.enemyStrength))
     || !exactKeys(warfare, ['reserve', 'lastSettledTurn', 'fronts'])
     || !integer(warfare.reserve) || !integer(warfare.lastSettledTurn, 0, state.turn)
     || !exactKeys(warfare.fronts, FRONTS.map(front => front.id))) return false;
@@ -295,7 +295,7 @@ function migrateV4State(state) {
 
 // Finance validation and the v6 migration are below the legacy compatibility layer.
 
-/** Accept current campaigns and migrate validated v4/v5 exports in memory. */
+/** Accept current campaigns and migrate validated v4/v5/v6 exports in memory. */
 export function parseSave(raw) {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > MAX_SAVE_LENGTH) {
     throw new Error('存档为空、过大或格式不正确。');
@@ -315,6 +315,10 @@ export function parseSave(raw) {
   if (state?.version === 5) {
     if (!isValidV5State(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
     state = migrateV5State(state);
+  }
+  if (state?.version === 6) {
+    if (!isValidV6State(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
+    state = { ...state, version: 7, enemyStrength: Math.round((.4 + (state.enemyStrength - 1) * .15) * 100) / 100 };
   }
   if (!isValidState(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
   return state;
@@ -426,15 +430,19 @@ function validSettlement(state) {
     && report.totalTroopsAfter === report.totalTroopsBefore + report.reinforcements - playerLosses;
 }
 
-/** Validate a current campaign before allowing it back into the action loop. */
-export function isValidState(state) {
+function validFinancialState(state, version) {
   try {
     const keys = [...STATE_KEYS];
     for (const optional of ['defeatReason', 'legacyEnding']) if (Object.hasOwn(state || {}, optional)) keys.push(optional);
-    return exactKeys(state, keys) && state.version === 6 && validCommonState(state)
+    return exactKeys(state, keys) && state.version === version && validCommonState(state)
       && validWarfare(state) && validEnding(state) && validTreasury(state) && validSettlement(state);
   } catch { return false; }
 }
+
+function isValidV6State(state) { return validFinancialState(state, 6); }
+
+/** Validate the direct, two-decimal difficulty schema used by current campaigns. */
+export function isValidState(state) { return validFinancialState(state, 7); }
 
 function migrateV5State(state) {
   const migrated = { ...state, version: 6, treasury: { entries: [], nextId: 1 }, lastSettlement: null };
