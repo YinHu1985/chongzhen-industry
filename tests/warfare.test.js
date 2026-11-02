@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, performAction, getCombatRating, getGoals, getCampaignOutcome, PROJECTS } from '../src/game.js';
+import { createGame, performAction, getCombatRating, getGoals, getCampaignOutcome, getFinanceInfo, PROJECTS } from '../src/game.js';
 import { FRONTS, createWarfare } from '../src/warfare.js';
 import { act, playCampaign } from './helpers/campaign.mjs';
 
@@ -183,12 +183,14 @@ test('crossing any enemy collapse threshold immediately ends the campaign with o
   for (const failing of [['wokou'], ['qing', 'wokou'], ['li', 'qing', 'wokou']]) {
     let state = fixture();
     for (const definition of FRONTS) if (failing.includes(definition.id)) state.warfare.fronts[definition.id].troops = definition.defeatThreshold;
-    const turn = state.turn, money = state.money;
+    const turn = state.turn, money = state.money, netIncome = getFinanceInfo(state).netIncome;
     state = act(state, { type: 'endTurn' });
     assert.equal(state.status, 'lost');
     assert.equal(state.defeatReason, failing[0]);
     assert.equal(state.turn, turn);
-    assert.equal(state.money, money, 'a lost campaign receives no next-season allowance');
+    assert.equal(state.money, money + netIncome, 'the terminal season still settles its own income and expense');
+    assert.equal(state.lastSettlement.moneyAfter, state.money);
+    assert.equal(state.lastSettlement.netIncome, netIncome);
     assert.equal(getCampaignOutcome(state).reason, failing[0]);
   }
 });
@@ -317,16 +319,16 @@ function plannedDeployment(state) {
   ];
 }
 
-test('the default 24-season cold army campaign can win using only financed public actions and recurring deployment', () => {
+test('the default 24-season cold army campaign survives using financed public actions and recurring deployment', () => {
   const { state, history } = playCampaign('cold', { deployFronts: plannedDeployment });
   assert.equal(state.enemyStrength, 3);
-  assert.equal(state.status, 'won');
+  assert.ok(['won', 'stalemate'].includes(state.status), 'ongoing research advances at season end, so survival may remain a stalemate in the shortest campaign');
   assert.equal(state.turn, 24);
   assert.ok(history.some(({action}) => action.type === 'configureFront'));
-  assert.ok(getGoals(state).every(goal => goal.done));
+  assert.ok(getCombatRating(state).fronts.every(item => item.done || (item.lastBattle.sustainable && item.lastBattle.enemyDeclining)));
 });
 
-for (const [doctrine, maxTurns] of [['minie', 40], ['cuirassier', 40], ['breech', 64]]) test(`a ${maxTurns}-season ${doctrine} campaign can win through public research, training and deployment`, () => {
+for (const [doctrine, maxTurns] of [['cold', 40], ['minie', 40], ['cuirassier', 40], ['breech', 64]]) test(`a ${maxTurns}-season ${doctrine} campaign can win through public research, training and deployment`, () => {
   const { state } = playCampaign(doctrine, { maxTurns, deployFronts: plannedDeployment });
   assert.equal(state.status, 'won');
   assert.equal(state.turn, maxTurns);

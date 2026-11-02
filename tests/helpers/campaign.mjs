@@ -1,4 +1,4 @@
-import { createGame, performAction, getProjectInfo, getFacilityInfo, getTrainingInfo } from '../../src/game.js';
+import { createGame, performAction, getProjectInfo, getFacilityInfo, getTrainingInfo, getFinanceInfo } from '../../src/game.js';
 
 export function act(state, action) {
   const result = performAction(state, action);
@@ -34,13 +34,13 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,d
     state=act(state,action);
     history.push({turn:state.turn,action});
     onAction?.(state,action);
-    if(state.pending?.kind==='rescue') take({type:'rescue',accept:state.money>=state.pending.cost});
+    if(state.pending?.kind==='rescue') take({type:'rescue',accept:state.money>=state.pending.cost+getFinanceInfo(state).expenses});
   };
   take({type:'selectDoctrine',id:doctrine});
   const trainOne=()=>{
     const branch=doctrine==='cuirassier'?'cavalry':'infantry';
     const option=[branch,'drill','coordination'].map(id=>({id,...getTrainingInfo(state,id)})).filter(i=>i.canTrain).sort((a,b)=>a.current-b.current)[0];
-    if(!option)return false;
+    if(!option||state.money-option.cost<getFinanceInfo(state).expenses)return false;
     take({type:'train',branch:option.id});return true;
   };
   while(state.status==='playing') {
@@ -52,15 +52,16 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,d
         if(id.startsWith('@')) {
           const building=getFacilityInfo(state,id.slice(1));
           if(!building.built&&building.unlocked) {
-            if(building.canBuild) {take({type:'build',id:building.id});changed=true;}
-            else if(state.money<building.cost) {saving=true;break;}
+            if(building.canBuild&&state.money-building.cost>=getFinanceInfo(state).expenses) {take({type:'build',id:building.id});changed=true;}
+            else if(state.money<building.cost+getFinanceInfo(state).expenses) {saving=true;break;}
           }
           continue;
         }
         let info=getProjectInfo(state,id);
-        if(info.canInvest) {take({type:'invest',id});changed=true;}
+        const team=info.availableTeams.find(team=>team.available&&team.canAssign);
+        if(!info.isAssigned&&team&&getProjectInfo(state,id,team.id).canInvest&&state.money>=getFinanceInfo(state).expenses+info.investCost) {take({type:'invest',id,teamId:team.id});changed=true;}
         info=getProjectInfo(state,id);
-        if(info.canTest&&info.progress>=95&&!(id===deferProject&&state.turn<deferUntil)) {
+        if(info.canTest&&info.progress>=95&&state.money-info.testCost>=getFinanceInfo(state).expenses&&!(id===deferProject&&state.turn<deferUntil)) {
           if(id===deferProject)beforeDeferredTest=structuredClone(state);
           take({type:'test',id});changed=true;
         }
@@ -68,6 +69,10 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,onAction,d
       if(!changed)break;
     }
     if(!saving)while(state.status==='playing'&&trainOne()) { /* use idle teams */ }
+    while(state.status==='playing'&&getFinanceInfo(state).shortfall) {
+      const order=getFinanceInfo(state).expenseItems.at(-1);
+      take({type:'cancelResearch',teamId:order.teamId});
+    }
     if(state.status==='playing'&&deployFronts) {
       for(const action of deployFronts(state)) take(action);
     }

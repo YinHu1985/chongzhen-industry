@@ -24,12 +24,13 @@ test('three research categories partition every ordinary project and exclude aut
   assert.deepEqual(researchCards(state, 'unknown').map(card => card.project.id), researchCards(state, 'industry').map(card => card.project.id));
 });
 
-test('completed, locked, already-invested and test-ready work have distinct status priority', () => {
+test('completed, locked, queued and test-ready work have distinct status priority', () => {
   const state = createGame();
   const status = info => researchStatus({ completed: false, locked: false, investedTurn: 0, canTest: false, canInvest: true, ...info }, state).id;
   assert.equal(status({ completed: true, locked: true, investedTurn: state.turn, canTest: true }), 'completed');
   assert.equal(status({ locked: true, investedTurn: state.turn, canTest: true }), 'locked');
-  assert.equal(status({ investedTurn: state.turn, canTest: true }), 'invested');
+  assert.equal(status({ isAssigned: true, progress: 50, canTest: true }), 'queued');
+  assert.equal(status({ isAssigned: true, progress: 100, canTest: true }), 'ready');
   assert.equal(status({ canTest: true }), 'ready');
   assert.equal(status({ canInvest: false }), 'waiting');
   assert.equal(status({}), 'available');
@@ -75,14 +76,15 @@ test('finishing one family member preserves completed work and every higher or a
 });
 
 
-test('unlocked research distinguishes insufficient funds from fully occupied teams', () => {
+test('unlocked research can be scheduled without current funds but still needs an eligible team', () => {
   const state = performAction(createGame(), { type: 'build', id: 'workshop' }).state;
   const project = researchCards(state, 'industry').find(card => card.info.canInvest).project;
   const busy = structuredClone(state);
   busy.teams.forEach(team => { team.usedTurn = busy.turn; });
   assert.equal(researchStatus(getProjectInfo(busy, project.id), busy).label, '待团队');
   const poor = structuredClone(state); poor.money = 0;
-  assert.equal(researchStatus(getProjectInfo(poor, project.id), poor).label, '待拨款');
+  assert.equal(researchStatus(getProjectInfo(poor, project.id), poor).id, 'available');
+  assert.equal(getProjectInfo(poor, project.id).canInvest, true);
 });
 
 test('milestone conditions open separately from the research grid with all sufficient alternatives', () => {
@@ -186,7 +188,7 @@ test('unassigned or busy selections never silently substitute an available resea
   assert.ok(state.teams.some(team => team.usedTurn !== state.turn), 'another team is available but must not replace the selected one');
 });
 
-test('research trials remain available after their assigned team has worked this season', () => {
+test('research trials remain available at full preparation when their original team is free to change targets', () => {
   let state = workshop();
   const teamId = state.teams[0].id;
   state = act(state, {type:'invest',id:'standards',teamId});
@@ -194,7 +196,7 @@ test('research trials remain available after their assigned team has worked this
   state.projects.standards.progress = 100;
   const selected = selectResearchTechnology(state, ui('industry'), 'standards');
   assert.equal(selected.selectedResearchTeamId, teamId);
-  assert.equal(getTeamActivity(state, teamId).available, false);
+  assert.equal(getTeamActivity(state, teamId).queued, false);
   const html = researchBoard(state, selected, icons);
   assert.match(actionButton(html, 'invest'), /\bdisabled\b/);
   assert.ok(!/\bdisabled\b/.test(actionButton(html, 'test')));
@@ -256,4 +258,36 @@ test('research controls stay beside the selected team while technology backgroun
       assert.ok(!background.includes(escapedText(project.lore)), `${project.id}: old narrator commentary must not return`);
     }
   }
+});
+
+
+test('queued research presents recurring cost, cancellation and a target change without pretending it spent money', () => {
+  let state = workshop();
+  const teamId = state.teams[0].id;
+  const before = state.money;
+  state = act(state, { type: 'invest', id: 'survey', teamId });
+  assert.equal(state.money, before);
+  const selected = selectResearchTechnology(state, ui('industry'), 'survey');
+  const html = researchBoard(state, selected, icons);
+  assert.match(html, /持续研究中/);
+  assert.match(html, /每季 [^<]*两/);
+  assert.match(actionButton(html, 'invest'), /\bdisabled\b/);
+  assert.ok(!/\bdisabled\b/.test(actionButton(html, 'cancel-research')));
+  const other = selectResearchTechnology(state, selected, 'standards');
+  const changed = researchBoard(state, other, icons);
+  assert.match(changed, /更换目标/);
+  assert.ok(!/\bdisabled\b/.test(actionButton(changed, 'invest')));
+});
+
+test('research trials with partial preparation need no selected team and may repeat within a season', () => {
+  const state = workshop();
+  state.projects.survey.progress = 10;
+  state.projects.survey.testedTurn = state.turn;
+  state.teams.forEach(team => { team.usedTurn = state.turn; });
+  const selected = selectResearchTechnology(state, ui('industry'), 'survey');
+  assert.equal(selected.selectedResearchTeamId, null);
+  const html = researchBoard(state, selected, icons);
+  assert.match(actionButton(html, 'invest'), /\bdisabled\b/);
+  assert.ok(!/\bdisabled\b/.test(actionButton(html, 'test')));
+  assert.match(html, /验收无需团队/);
 });

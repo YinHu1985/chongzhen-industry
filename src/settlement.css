@@ -41,3 +41,14 @@
 @media (max-width: 760px) {
   .estate-panorama-frame { inset: 150px 0 130px; }
 }
+
+.estate-district.is-revealing {
+  animation: district-constructed 1.5s cubic-bezier(.22,.61,.36,1) both;
+}
+@keyframes district-constructed {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .estate-district.is-revealing { animation: none; opacity: 1; }
+}

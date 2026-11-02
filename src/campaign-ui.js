@@ -8,11 +8,12 @@ const number = value => Math.round(Number(value) || 0).toLocaleString('zh-CN');
 const meter = value => `<div class="progress-track"><span style="width:${Math.max(0, Math.min(100, value))}%"></span></div>`;
 
 function teamCard(team, candidate, info) {
+  const queued = !candidate && team.activity?.kind === 'research' && team.canAssign !== false && team.available === false;
   const strongest = Object.entries(team.specialties).sort((a,b) => b[1]-a[1]).slice(0,2).map(([id]) => id);
   return `<article class="team-card ${candidate?'candidate':''} ${team.available===false&&!candidate?'occupied':''}">
-    <header>${teamPortrait(team,'large')}<div><small>${candidate?'待聘人才':team.available?'本季待命':'本季已派遣'}</small><h3>${esc(team.name)}</h3></div></header>
+    <header>${teamPortrait(team,'large')}<div><small>${candidate?'待聘人才':queued?'已安排研制':team.available?'本季待命':'本季已派遣'}</small><h3>${esc(team.name)}</h3></div></header>
     <div class="specialty-grid">${SPECIALTIES.map(s=>`<div class="specialty ${strongest.includes(s.id)?'strong':''}"><span>${esc(s.name)}</span><b>${team.specialties[s.id]}</b>${meter(team.specialties[s.id])}</div>`).join('')}</div>
-    <footer>${candidate?`<div><small>一次性聘银</small><strong>${silver(team.hireCost)} 两</strong></div><button class="small-button primary" data-action="hire-team" data-id="${team.id}" ${team.canHire?'':'disabled'}>延请入署</button>`:`<span>${team.available?'可参与科技、营建或操演':'下季恢复待命'}</span><button class="text-button dismiss-team" data-action="dismiss-team" data-id="${team.id}" ${team.canDismiss?'':'disabled'}>解雇 · 威望 −${info.dismissPrestigeCost}</button>`}</footer>
+    <footer>${candidate?`<div><small>一次性聘银</small><strong>${silver(team.hireCost)} 两</strong></div><button class="small-button primary" data-action="hire-team" data-id="${team.id}" ${team.canHire?'':'disabled'}>延请入署</button>`:`<span>${queued?'研究指令持续执行，可在密录取消或改派':team.available?'可参与科技、营建或操演':'本季差事已毕，下季可另行安排'}</span><button class="text-button dismiss-team" data-action="dismiss-team" data-id="${team.id}" ${team.canDismiss?'':'disabled'}>解雇 · 威望 −${info.dismissPrestigeCost}</button>`}</footer>
     ${candidate&&!team.canHire?`<p class="team-reason">${esc(team.reason)}</p>`:!candidate&&!team.canDismiss?`<p class="team-reason">${esc(team.dismissReason)}</p>`:''}
   </article>`;
 }
@@ -21,7 +22,7 @@ export function teamsPage(state, tab = 'roster') {
   const info = getRecruitmentInfo(state);
   const recruiting = tab === 'recruit';
   return `<div class="personnel-tabs" role="group" aria-label="团队与招募"><button data-action="team-tab" data-id="roster" class="${recruiting?'':'selected'}" aria-pressed="${!recruiting}">在署团队 <b>${info.teamCount} / ${info.maxTeams}</b></button><button data-action="team-tab" data-id="recruit" class="${recruiting?'selected':''}" aria-pressed="${recruiting}">招募人才 <b>${info.candidates.length} 位候选</b></button></div>
-    ${recruiting?`<div class="recruitment-banner"><div><h3>招贤榜</h3><p>征召更换整份名单；雇佣时另付聘银，入署即可派遣。</p></div><button class="small-button primary" data-action="refresh-candidates" ${info.canRefresh?'':'disabled'}>${icon('restart')} 招募新名单 · ${silver(info.refreshCost)} 两</button></div>${!info.canRefresh?`<p class="team-reason">${esc(info.refreshReason)}</p>`:''}<div class="team-grid candidate-grid">${info.candidates.map(team=>teamCard(team,true,info)).join('')||'<p class="recruit-empty">当前名单已无候选，可拨银再开招贤榜。</p>'}</div>`:`<p class="personnel-guide">洋务助起步，数理攻难关，管理成规模。每队每季一项差事；解雇损失 ${info.dismissPrestigeCost} 点威望。</p><div class="team-grid">${info.teams.map(team=>teamCard(team,false,info)).join('')}</div>`}`;
+    ${recruiting?`<div class="recruitment-banner"><div><h3>招贤榜</h3><p>征召更换整份名单；雇佣时另付聘银，入署即可派遣。</p></div><button class="small-button primary" data-action="refresh-candidates" ${info.canRefresh?'':'disabled'}>${icon('restart')} 招募新名单 · ${silver(info.refreshCost)} 两</button></div>${!info.canRefresh?`<p class="team-reason">${esc(info.refreshReason)}</p>`:''}<div class="team-grid candidate-grid">${info.candidates.map(team=>teamCard(team,true,info)).join('')||'<p class="recruit-empty">当前名单已无候选，可拨银再开招贤榜。</p>'}</div>`:`<p class="personnel-guide">洋务助起步，数理攻难关，管理成规模。研究指令持续执行，其余差事每队每季一项；解雇损失 ${info.dismissPrestigeCost} 点威望。</p><div class="team-grid">${info.teams.map(team=>teamCard(team,false,info)).join('')}</div>`}`;
 }
 
 export function enemyStrengthSelector(value = 3) {

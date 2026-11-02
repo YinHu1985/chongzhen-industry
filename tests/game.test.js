@@ -78,30 +78,36 @@ test('research skill demands change from foreign adoption to precision mathemati
   assert.ok(best.availableTeams.every(t=>Number.isInteger(t.match)&&Number.isInteger(t.chance)));
 });
 
-test('successful and stalled research both spend money and occupy the selected team, retaining partial progress',()=>{
+test('standing research orders spend nothing until season end, when success and setbacks both produce progress',()=>{
   for(const successful of [true,false]){
-    const state=workshopGame();const info=getProjectInfo(state,'standards',state.teams[0].id);
-    state.rng=rollSeed(successful?0:info.researchChance,successful?info.researchChance:100);
-    const original=JSON.stringify(state);
-    const next=act(state,{type:'invest',id:'standards',teamId:state.teams[0].id});
-    assert.equal(JSON.stringify(state),original);
-    assert.equal(next.money,state.money-info.investCost);
-    assert.equal(next.teams[0].usedTurn,next.turn);
+    const initial=workshopGame();const teamId=initial.teams[0].id;
+    const info=getProjectInfo(initial,'standards',teamId);
+    initial.rng=rollSeed(successful?0:info.researchChance,successful?info.researchChance:100);
+    const original=JSON.stringify(initial);
+    const queued=act(initial,{type:'invest',id:'standards',teamId});
+    assert.equal(JSON.stringify(initial),original);
+    assert.equal(queued.money,initial.money);assert.equal(queued.rng,initial.rng);
+    assert.equal(queued.teams[0].usedTurn,initial.teams[0].usedTurn);
+    assert.equal(queued.projects.standards.progress,0);
+    assert.equal(getTeamActivity(queued,teamId).queued,true);
+    const next=finishSeason(queued);
+    assert.equal(next.money,initial.money-info.investCost+getSummary(initial).income);
     assert.equal(next.projects.standards.progress,successful?info.progressGain:info.failureProgressGain);
     assert.equal(next.stats[successful?'researchSuccesses':'researchSetbacks'],1);
-    assert.ok(performAction(next,{type:'invest',id:'standards',teamId:next.teams[1].id}).error);
-    assert.ok(performAction(next,{type:'invest',id:'survey',teamId:next.teams[0].id}).error);
   }
 });
 
-test('invalid actions preserve the original state and RNG; teams become available next season',()=>{
+test('invalid orders preserve state while a research reservation persists until cancellation',()=>{
   let state=workshopGame();const before=JSON.stringify(state);
   for(const action of [{type:'invest',id:'minie_rifle'},{type:'invest',id:'survey',teamId:'missing'},{type:'selectDoctrine',id:'unknown'}]){
     const result=performAction(state,action);assert.ok(result.error);assert.equal(result.state,state);assert.equal(JSON.stringify(state),before);
   }
-  state=act(state,{type:'invest',id:'survey'});assert.equal(getSummary(state).freeTeams,4);
-  const progress=state.projects.survey.progress;state=finishSeason(state);
-  assert.equal(getSummary(state).freeTeams,5);assert.equal(state.projects.survey.progress,progress);
+  const teamId=state.teams[0].id;
+  state=act(state,{type:'invest',id:'standards',teamId});assert.equal(getSummary(state).freeTeams,4);
+  state.rng=rollSeed(95,100);state=finishSeason(state);
+  assert.equal(getSummary(state).freeTeams,4);
+  assert.ok(state.projects.standards.progress>0);
+  state=act(state,{type:'cancelResearch',teamId});assert.equal(getSummary(state).freeTeams,5);
 });
 
 test('candidate refresh and hiring are distinct payments; dismissal loses prestige and preserves one team',()=>{
@@ -215,7 +221,7 @@ test('trials allow one paid rescue and round-tripped saves reproduce its outcome
   assert.ok(performAction(state,{type:'endTurn'}).error);assert.ok(performAction(state,{type:'invest',id:'school'}).error);
   const saved=structuredClone(state),result=act(state,{type:'rescue',accept:true});
   assert.deepEqual(result,act(saved,{type:'rescue',accept:true}));assert.equal(result.stats.rescues,1);
-  assert.ok(performAction(result,{type:'rescue',accept:true}).error);assert.ok(performAction(result,{type:'test',id:'survey'}).error);
+  assert.ok(performAction(result,{type:'rescue',accept:true}).error);
 });
 
 test('new campaigns replace scripted crisis choices with persistent fronts',()=>{
@@ -257,77 +263,72 @@ for(const doctrine of DOCTRINES.map(d=>d.id))test(`financed ${doctrine} research
 });
 
 
-test('team research assignment persists across seasons without automatic investment or progress',()=>{
+test('standing research continues across seasons then stops charging at full preparation',()=>{
   let state=workshopGame();const teamId=state.teams[0].id;
-  assert.equal(getTeamActivity(state,teamId).kind,'idle');
-  state.rng=rollSeed(95,100);
-  state=act(state,{type:'invest',id:'survey',teamId});
-  const current=getTeamActivity(state,teamId),money=state.money,investments=state.stats.investments;
-  assert.deepEqual(state.teams[0].activity,{kind:'research',targetId:'survey',turn:1});
-  assert.equal(current.projectId,'survey');assert.equal(current.active,true);
-  assert.equal(current.progress,getProjectInfo(state,'survey').progress);
-  assert.equal(current.available,false);assert.equal(current.currentTurn,true);
+  state=act(state,{type:'invest',id:'standards',teamId});
+  const initial=state.money,cost=getProjectInfo(state,'standards').investCost;
+  state.rng=rollSeed(0,1);state=finishSeason(state);
+  assert.equal(state.projects.standards.progress,100);
+  assert.equal(state.money,initial-cost+getSummary(state).income);
+  assert.equal(getTeamActivity(state,teamId).queued,false);
+  assert.match(getTeamActivity(state,teamId).statusLabel,/待验收/);
+  const money=state.money,investments=state.stats.investments;
   state=finishSeason(state);
-  const next=getTeamActivity(state,teamId);
-  assert.equal(next.projectId,'survey');assert.equal(next.progress,current.progress);
-  assert.equal(next.currentTurn,false);assert.equal(next.available,true);
-  assert.equal(next.statusLabel,'待继续投入');
-  assert.equal(state.stats.investments,investments);assert.equal(state.money,money+getSummary(state).income);
+  assert.equal(state.stats.investments,investments);
+  assert.equal(state.money,money+getSummary(state).income);
 });
 
-test('changing the team for a research project clears the previous assignment without losing preparation',()=>{
+test('reassigning research changes its sole owner without spending or losing preparation',()=>{
   let state=workshopGame();const first=state.teams[0].id,second=state.teams[1].id;
-  state.rng=rollSeed(95,100);state=act(state,{type:'invest',id:'survey',teamId:first});
-  const progress=state.projects.survey.progress;state=finishSeason(state);
-  const before=JSON.stringify(state);state=act(state,{type:'invest',id:'survey',teamId:second});
-  assert.ok(state.projects.survey.progress>progress);
+  state=act(state,{type:'invest',id:'survey',teamId:first});
+  const money=state.money,rng=state.rng;
+  state=act(state,{type:'invest',id:'survey',teamId:second});
+  assert.equal(state.projects.survey.progress,0);
   assert.equal(state.teams.find(t=>t.id===first).activity,null);
-  assert.equal(getTeamActivity(state,first).projectId,null);
   assert.equal(getTeamActivity(state,second).projectId,'survey');
+  assert.equal(state.money,money);assert.equal(state.rng,rng);
   assert.equal(state.teams.filter(t=>t.activity?.kind==='research'&&t.activity.targetId==='survey').length,1);
-  assert.notEqual(JSON.stringify(state),before);
-  const denied=performAction(state,{type:'invest',id:'standards',teamId:second});
-  assert.ok(denied.error);assert.equal(denied.state,state);
-  assert.equal(getTeamActivity(denied.state,second).projectId,'survey');
+  state=act(state,{type:'invest',id:'standards',teamId:second});
+  assert.equal(getTeamActivity(state,second).projectId,'standards');
+  assert.equal(getProjectInfo(state,'survey').isAssigned,false);
 });
 
-test('completed research shows a seasonal conclusion and no longer links as an active assignment',()=>{
+test('completed research ends its recurring expense and the team can be reassigned immediately',()=>{
   let state=workshopGame();const teamId=state.teams[0].id;
-  state.rng=rollSeed(0,1);state=act(state,{type:'invest',id:'survey',teamId});
-  assert.equal(getTeamActivity(state,teamId).statusLabel,'待验收');
-  // Testing on a later season still marks this season as the completion date.
-  state=finishSeason(state);state.rng=rollSeed(0,1);state=act(state,{type:'test',id:'survey'});
-  const done=getTeamActivity(state,teamId);
-  assert.equal(done.kind,'research');assert.equal(done.active,false);assert.equal(done.projectId,null);
-  assert.equal(done.progress,100);assert.equal(done.currentTurn,true);assert.equal(done.statusLabel,'本季已结项');
-  state=finishSeason(state);assert.equal(getTeamActivity(state,teamId).kind,'idle');
+  state=act(state,{type:'invest',id:'survey',teamId});
+  state.rng=rollSeed(0,1);state=finishSeason(state);
+  assert.match(getTeamActivity(state,teamId).statusLabel,/待验收/);
+  state.rng=rollSeed(0,1);state=act(state,{type:'test',id:'survey'});
+  assert.equal(state.projects.survey.completed,true);
+  assert.equal(getTeamActivity(state,teamId).active,false);
+  state=act(state,{type:'invest',id:'standards',teamId});
+  assert.equal(getTeamActivity(state,teamId).projectId,'standards');
 });
 
-test('building and training replace research assignments while retaining project preparation',()=>{
-  let state=createGame();const builder=getFacilityInfo(state,'workshop').selectedTeamId;
-  state=act(state,{type:'build',id:'workshop'});
-  assert.equal(getTeamActivity(state,builder).kind,'build');assert.equal(getTeamActivity(state,builder).projectId,null);
-  state=finishSeason(state);assert.equal(getTeamActivity(state,builder).kind,'idle');
-  // The same military-management team can be reassigned next season to training.
-  complete(state,'drill_manual');state.facilities.drill_ground=1;
+test('training respects research reservations until the player explicitly cancels them',()=>{
+  let state=workshopGame();complete(state,'drill_manual');state.facilities.drill_ground=1;
   const trainer=getTrainingInfo(state,'infantry').selectedTeamId;
-  state.rng=rollSeed(95,100);state=act(state,{type:'invest',id:'school',teamId:trainer});
-  const progress=state.projects.school.progress;state=finishSeason(state);
-  assert.equal(getTrainingInfo(state,'infantry').selectedTeamId,trainer);
+  state=act(state,{type:'invest',id:'school',teamId:trainer});
+  for(const team of state.teams)if(team.id!==trainer)team.usedTurn=state.turn;
+  assert.equal(getTrainingInfo(state,'infantry').canTrain,false);
+  const denied=performAction(state,{type:'train',branch:'infantry'});
+  assert.ok(denied.error);assert.equal(denied.state,state);
+  state=act(state,{type:'cancelResearch',teamId:trainer});
+  assert.equal(getTrainingInfo(state,'infantry').canTrain,true);
   state=act(state,{type:'train',branch:'infantry'});
-  const training=getTeamActivity(state,trainer);
-  assert.equal(training.kind,'train');assert.equal(training.targetId,'infantry');assert.equal(training.projectId,null);
-  assert.equal(training.active,false);assert.equal(state.projects.school.progress,progress);
-  state=finishSeason(state);assert.equal(getTeamActivity(state,trainer).kind,'idle');
+  assert.equal(getTeamActivity(state,trainer).kind,'train');
+  assert.equal(state.projects.school.progress,0);
+  assert.ok(performAction(state,{type:'invest',id:'school',teamId:trainer}).error);
 });
 
-test('untracked existing teams and dismissed team ids resolve to an empty research slot',()=>{
+test('untracked or dismissed teams have no research queue and retain project preparation',()=>{
   let state=workshopGame();const id=state.teams[0].id;delete state.teams[0].activity;
   assert.equal(getTeamActivity(state,id).kind,'idle');
-  state=act(state,{type:'invest',id:'survey',teamId:id});assert.equal(getTeamActivity(state,id).active,true);
-  const progress=state.projects.survey.progress;state=act(state,{type:'dismissTeam',teamId:id});
+  state=act(state,{type:'invest',id:'survey',teamId:id});
+  state.rng=rollSeed(95,100);state=finishSeason(state);
+  const progress=state.projects.survey.progress;assert.ok(progress>0);
+  state=act(state,{type:'dismissTeam',teamId:id});
   assert.equal(state.projects.survey.progress,progress);assert.equal(getTeamActivity(state,id).projectId,null);
-  assert.equal(getTeamActivity(state,id).available,false);
 });
 
 test('court observation doubles trial prestige stakes without changing odds, expense or technical outcome',()=>{

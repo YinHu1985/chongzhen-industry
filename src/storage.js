@@ -3,8 +3,9 @@ import { PROJECTS, FACILITIES, createGame, getProjectInfo } from './game.js';
 
 const CAMPAIGN_TEMPLATES = new Map([24, 40, 64].map(maxTurns => [maxTurns, createGame({ maxTurns })]));
 const INITIAL_STATE = CAMPAIGN_TEMPLATES.get(24);
-const STATE_KEYS = [...new Set([...Object.keys(INITIAL_STATE), 'enemyStrength', 'warfare'])];
-const LEGACY_KEYS = STATE_KEYS.filter(key => !['enemyStrength', 'warfare'].includes(key));
+const STATE_KEYS = [...new Set([...Object.keys(INITIAL_STATE), 'enemyStrength', 'warfare', 'treasury', 'lastSettlement'])];
+const V5_KEYS = STATE_KEYS.filter(key => !['treasury', 'lastSettlement'].includes(key));
+const LEGACY_KEYS = V5_KEYS.filter(key => !['enemyStrength', 'warfare'].includes(key));
 const BRANCHES = Object.keys(INITIAL_STATE.army);
 const STAT_KEYS = Object.keys(INITIAL_STATE.stats);
 const PROJECT_IDS = PROJECTS.map(project => project.id);
@@ -35,7 +36,7 @@ function validProjects(state) {
       && (!project.completed || project.progress === 100)
       && integer(project.investedTurn, 0, state.turn)
       && integer(project.testedTurn, 0, state.turn)
-      && integer(project.attempts, 0, state.turn)
+      && integer(project.attempts, 0, state.version < 6 ? state.turn : 1_000_000_000)
       && (automatic || id === 'joint_trials'
         ? project.attempts === 0 && project.investedTurn === 0 && project.testedTurn === 0
         : !project.completed || project.attempts > 0);
@@ -61,10 +62,11 @@ function validTeams(state) {
     // An absent activity is simply a team with no tracked assignment.
     if (activity !== undefined && activity !== null) {
       if (state.candidates.includes(team) || !exactKeys(activity, ['kind', 'targetId', 'turn'])
-        || !integer(activity.turn, 1, state.turn) || activity.turn !== team.usedTurn) return false;
+        || !integer(activity.turn, 1, state.turn)
+        || ((state.version < 6 || activity.kind !== 'research') && activity.turn !== team.usedTurn)) return false;
       if (activity.kind === 'research') {
         if (!PROJECT_IDS.includes(activity.targetId) || activity.targetId === 'joint_trials'
-          || state.projects[activity.targetId]?.investedTurn !== activity.turn
+          || (state.version < 6 && state.projects[activity.targetId]?.investedTurn !== activity.turn)
           || researchAssignments.has(activity.targetId)) return false;
         researchAssignments.add(activity.targetId);
       } else if (activity.kind === 'build') {
@@ -270,17 +272,16 @@ function validEnding(state) {
     : state.status === 'stalemate' && !hasReason;
 }
 
-/** Validate a current campaign before allowing it back into the action loop. */
-export function isValidState(state) {
+function isValidV5State(state) {
   try {
-    const keys = [...STATE_KEYS];
+    const keys = [...V5_KEYS];
     for (const optional of ['defeatReason', 'legacyEnding']) if (Object.hasOwn(state || {}, optional)) keys.push(optional);
     return exactKeys(state, keys) && state.version === 5 && validCommonState(state)
       && validWarfare(state) && validEnding(state);
   } catch { return false; }
 }
 
-function migrateLegacyState(state) {
+function migrateV4State(state) {
   const migrated = { ...state, version: 5, enemyStrength: 3,
     warfare: createWarfare(state.maxTurns, state.turn), plannedEvents: [], resolvedEvents: [] };
   if (migrated.pending?.kind === 'event') migrated.pending = null;
@@ -292,7 +293,9 @@ function migrateLegacyState(state) {
   return migrated;
 }
 
-/** Accept v5 campaigns and carefully migrate valid v4 exports or the existing local slot. */
+// Finance validation and the v6 migration are below the legacy compatibility layer.
+
+/** Accept current campaigns and migrate validated v4/v5 exports in memory. */
 export function parseSave(raw) {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > MAX_SAVE_LENGTH) {
     throw new Error('存档为空、过大或格式不正确。');
@@ -307,8 +310,138 @@ export function parseSave(raw) {
   }
   if (state?.version === 4) {
     if (!isValidLegacyState(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
-    state = migrateLegacyState(state);
+    state = migrateV4State(state);
+  }
+  if (state?.version === 5) {
+    if (!isValidV5State(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
+    state = migrateV5State(state);
   }
   if (!isValidState(state)) throw new Error('存档版本不兼容或数据不完整，无法载入。');
   return state;
+}
+
+const LEDGER_KEYS = ['id', 'turn', 'kind', 'category', 'label', 'amount', 'balance', 'projectId', 'teamId'];
+const EXPENSE_CATEGORIES = ['research', 'trial', 'rescue', 'construction', 'training', 'recruitment'];
+const INCOME_CATEGORIES = ['grant', 'prestige'];
+const financeId = value => integer(value, 1) || text(value, 100);
+const historicTeam = (state, id) => typeof id === 'string' && /^team_[1-9]\d*$/.test(id)
+  && integer(Number(id.slice(5)), 1, state.nextTeamId - 1);
+const sameEntry = (left, right) => LEDGER_KEYS.every(key => left[key] === right[key]);
+
+function validLedgerEntry(state, entry) {
+  return exactKeys(entry, LEDGER_KEYS) && integer(entry.id, 1)
+    && integer(entry.turn, 1, state.turn) && ['income', 'expense'].includes(entry.kind)
+    && (entry.kind === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).includes(entry.category)
+    && text(entry.label, 300) && integer(entry.amount, 1, MAX_MONEY) && integer(entry.balance, 0, MAX_MONEY)
+    && (entry.projectId === null || PROJECT_IDS.includes(entry.projectId))
+    && (entry.teamId === null || historicTeam(state, entry.teamId));
+}
+
+function validTreasury(state) {
+  const treasury = state.treasury;
+  if (!exactKeys(treasury, ['entries', 'nextId']) || !Array.isArray(treasury.entries)
+    || treasury.entries.length > 10_000 || !integer(treasury.nextId, 1, 10_001)
+    || treasury.nextId !== treasury.entries.length + 1) return false;
+  let previous = null, income = 0, expenses = 0;
+  for (const entry of treasury.entries) {
+    if (!validLedgerEntry(state, entry) || entry.id !== (previous?.id || 0) + 1
+      || (previous && (entry.turn < previous.turn
+        || entry.balance !== previous.balance + (entry.kind === 'income' ? entry.amount : -entry.amount)))) return false;
+    if (entry.kind === 'income') income += entry.amount; else expenses += entry.amount;
+    previous = entry;
+  }
+  return (!previous || previous.balance === state.money) && income <= state.stats.earned && expenses <= state.stats.spent;
+}
+
+const SETTLEMENT_KEYS = ['turn', 'date', 'moneyBefore', 'moneyAfter', 'reputationBefore', 'reputationAfter',
+  'income', 'expenses', 'netIncome', 'incomeItems', 'expenseItems', 'research', 'battles', 'reinforcements',
+  'reserveBefore', 'reserveAfter', 'totalTroopsBefore', 'totalTroopsAfter', 'entries', 'newFronts', 'status'];
+
+function validSettlement(state) {
+  const report = state.lastSettlement;
+  if (report === null) return true;
+  if (!exactKeys(report, SETTLEMENT_KEYS) || !integer(report.turn, 1, state.turn)
+    || report.turn !== state.warfare.lastSettledTurn || !text(report.date, 100)
+    || !STATUSES.includes(report.status)
+    || !['moneyBefore', 'moneyAfter', 'income', 'expenses'].every(key => integer(report[key], 0, MAX_MONEY))
+    || !integer(report.netIncome, -MAX_MONEY, MAX_MONEY)
+    || !['reputationBefore', 'reputationAfter'].every(key => integer(report[key], -1_000_000_000))
+    || !['reinforcements', 'reserveBefore', 'reserveAfter', 'totalTroopsBefore', 'totalTroopsAfter'].every(key => integer(report[key]))
+    || report.netIncome !== report.income - report.expenses
+    || report.moneyAfter !== report.moneyBefore + report.netIncome
+    || !Array.isArray(report.entries) || !Array.isArray(report.incomeItems) || !Array.isArray(report.expenseItems)
+    || !Array.isArray(report.research) || !Array.isArray(report.battles) || !Array.isArray(report.newFronts)
+    || report.entries.length > 10_000 || report.research.length > 8 || report.battles.length > FRONTS.length
+    || new Set(report.newFronts).size !== report.newFronts.length
+    || !report.newFronts.every(id => FRONTS.some(front => front.id === id
+      && Math.ceil(state.maxTurns * front.startFraction) === report.turn + 1))) return false;
+  let balance = report.moneyBefore, income = 0, expenses = 0, previousId = null;
+  for (const entry of report.entries) {
+    const original = state.treasury.entries[entry.id - 1];
+    if (!validLedgerEntry(state, entry) || entry.turn !== report.turn || !original || !sameEntry(entry, original)
+      || (previousId !== null && entry.id !== previousId + 1)) return false;
+    balance += entry.kind === 'income' ? entry.amount : -entry.amount;
+    if (balance !== entry.balance) return false;
+    if (entry.kind === 'income') income += entry.amount; else expenses += entry.amount;
+    previousId = entry.id;
+  }
+  if (balance !== report.moneyAfter || income !== report.income || expenses !== report.expenses) return false;
+  if (!report.incomeItems.every(item => exactKeys(item, ['id', 'label', 'amount'])
+    && financeId(item.id) && text(item.label, 300) && integer(item.amount, 0, MAX_MONEY))
+    || report.incomeItems.reduce((sum, item) => sum + item.amount, 0) !== report.income
+    || !report.expenseItems.every(item => exactKeys(item, ['id', 'category', 'label', 'amount', 'projectId', 'teamId'])
+      && financeId(item.id) && EXPENSE_CATEGORIES.includes(item.category) && text(item.label, 300)
+      && integer(item.amount, 0, MAX_MONEY) && (item.projectId === null || PROJECT_IDS.includes(item.projectId))
+      && (item.teamId === null || historicTeam(state, item.teamId)))
+    || report.expenseItems.reduce((sum, item) => sum + item.amount, 0) !== report.expenses) return false;
+  const projects = new Set(), teams = new Set();
+  for (const item of report.research) {
+    if (!exactKeys(item, ['projectId', 'name', 'teamId', 'teamName', 'before', 'after', 'gain', 'chance', 'passed', 'cost'])
+      || !PROJECT_IDS.includes(item.projectId) || item.projectId === 'joint_trials'
+      || !historicTeam(state, item.teamId) || projects.has(item.projectId) || teams.has(item.teamId)
+      || !text(item.name, 300) || !text(item.teamName, 100)
+      || !['before', 'after', 'gain', 'chance'].every(key => integer(item[key], 0, 100))
+      || item.after - item.before !== item.gain || typeof item.passed !== 'boolean'
+      || !integer(item.cost, 0, MAX_MONEY)) return false;
+    projects.add(item.projectId); teams.add(item.teamId);
+  }
+  const activeFronts = FRONTS.filter(front => report.turn >= Math.ceil(state.maxTurns * front.startFraction));
+  if (report.battles.length !== activeFronts.length) return false;
+  const frontIds = new Set();
+  let playerBefore = 0, playerAfter = 0, playerLosses = 0;
+  for (const battle of report.battles) {
+    const definition = activeFronts.find(front => front.id === battle.id);
+    const current = definition && state.warfare.fronts[battle.id].lastBattle;
+    if (!definition || frontIds.has(battle.id) || !exactKeys(battle, ['id', 'name', ...BATTLE_KEYS, 'enemyBefore', 'playerBefore'])
+      || !text(battle.name, 300) || !current || !BATTLE_KEYS.every(key => battle[key] === current[key])
+      || !integer(battle.enemyBefore, definition.minTroops, definition.maxTroops)
+      || !integer(battle.playerBefore, 0, 1_000_000)
+      || battle.enemyBefore !== battle.enemyAfter + battle.enemyLosses - battle.enemyReinforcements
+      || battle.playerBefore !== battle.playerCommitted) return false;
+    frontIds.add(battle.id);
+    playerBefore += battle.playerBefore; playerAfter += battle.playerAfter; playerLosses += battle.playerLosses;
+  }
+  return report.totalTroopsBefore === report.reserveBefore + playerBefore
+    && report.totalTroopsAfter === report.reserveAfter + playerAfter
+    && report.totalTroopsAfter === report.totalTroopsBefore + report.reinforcements - playerLosses;
+}
+
+/** Validate a current campaign before allowing it back into the action loop. */
+export function isValidState(state) {
+  try {
+    const keys = [...STATE_KEYS];
+    for (const optional of ['defeatReason', 'legacyEnding']) if (Object.hasOwn(state || {}, optional)) keys.push(optional);
+    return exactKeys(state, keys) && state.version === 6 && validCommonState(state)
+      && validWarfare(state) && validEnding(state) && validTreasury(state) && validSettlement(state);
+  } catch { return false; }
+}
+
+function migrateV5State(state) {
+  const migrated = { ...state, version: 6, treasury: { entries: [], nextId: 1 }, lastSettlement: null };
+  for (const team of [...migrated.teams, ...migrated.candidates]) {
+    if (team.activity?.kind === 'research') team.activity = null;
+  }
+  migrated.log.unshift({ id: migrated.nextLogId++, turn: migrated.turn, title: '科研账制更新', type: 'info',
+    text: '研究成果、已有准备、内库与本季已用团队均已保留。旧研究指派已清除；重新安排后才会逐季扣费推进。收支账簿从续接时开始记录，先前流水不作补造。' });
+  return migrated;
 }

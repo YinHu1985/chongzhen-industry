@@ -1,5 +1,5 @@
 /* A still, compact imperial research desk. Re-rendering never animates its frame. */
-body,body *,body::before,body::after,body *::before,body *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.atlas-window,.atlas-window *,.atlas-window::before,.atlas-window::after,.atlas-window *::before,.atlas-window *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 .game-shell button:not(:disabled):active{transform:none}
 /* Share other windows' vertical clearance for the HUD and command dock. */
 .game-window.atlas-window{inset-inline:12px;width:calc(100% - 24px);max-width:none;margin:0;transform:none;z-index:25;border-color:#c9b07a;box-shadow:0 15px 80px #071912b3,inset 0 0 0 4px #aa92582b;opacity:1}
@@ -348,3 +348,8 @@ body,body *,body::before,body::after,body *::before,body *::after{animation:none
 @media(max-height:650px) and (min-width:761px){
   .research-workspace{grid-template-rows:minmax(160px,1fr) 190px}
 }
+
+/* Persistent orders share the controls with independent trial actions. */
+.tech-detail-horizontal .detail-buttons .cancel-research{flex:.8;color:#98553d;border-color:#b18f66}
+.tech-detail-horizontal .detail-buttons:has(.cancel-research){gap:4px}
+.tech-detail-horizontal .detail-buttons:has(.cancel-research) .small-button{font-size:9px;padding-inline:3px}

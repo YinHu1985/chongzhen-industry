@@ -23,10 +23,10 @@ const makeIcon = (icon,name) => typeof icon === 'function' ? icon(name) : '';
 export function researchStatus(info, state) {
   if(info.completed) return {id:'completed',label:'已完成',tone:'complete'};
   if(info.locked) return {id:'locked',label:'条件未达',tone:'locked'};
-  if(info.investedTurn === state.turn) return {id:'invested',label:'本季已投入',tone:'invested'};
+  if(info.isAssigned && info.progress < 100) return {id:'queued',label:'持续研究',tone:'invested'};
   if(info.canTest) return {id:'ready',label:'可验收',tone:'ready'};
   if(!info.canInvest) {
-    const label = Number(state.money) < Number(info.investCost) ? '待拨款' : Array.isArray(info.availableTeams) && !info.availableTeams.some(t => t.available) ? '待团队' : info.testedTurn === state.turn ? '下季再验收' : '暂不可投入';
+    const label = Array.isArray(info.availableTeams) && !info.availableTeams.some(t => t.available) ? '待团队' : '暂不可安排';
     return {id:'waiting',label,tone:'waiting'};
   }
   return {id:'available',label:'可研究',tone:'available'};
@@ -75,10 +75,10 @@ export function teamRail(state, ui, icon) {
     const skills=Object.entries(team.specialties).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([id,value])=>`${specialtyName(id)} ${value}`).join(' · ');
     const work=task.active?task.name:task.currentTurn&&task.kind!=='idle'?task.name:'尚未安排研究';
     return `<button class="research-team-card ${ui.selectedResearchTeamId===team.id?'is-selected':''} ${!task.available?'is-busy':''}" data-action="inspect-team" data-id="${team.id}" aria-pressed="${ui.selectedResearchTeamId===team.id}"><div class="team-card-identity">${teamPortrait(team)}<div class="team-card-label"><div class="team-card-heading"><strong title="${esc(team.name)}">${esc(team.name)}</strong><small>${esc(task.statusLabel)}</small></div><p class="team-card-work">${esc(work)}</p></div></div><div class="team-card-progress"><span style="width:${task.active?percent(task.progress):0}%"></span></div><div class="team-card-meta"><small>${esc(skills)}</small><b>${task.active?`${percent(task.progress)}%`:'—'}</b></div></button>`;
-  }).join('')}</div><p class="team-rail-note">每队每季一项差事<br>研究跨季保留，投入由你安排</p></aside>`;
+  }).join('')}</div><p class="team-rail-note">每队每季一项差事<br>设定目标后，每季自动攻关</p></aside>`;
 }
 
-/** Selection only previews a pairing; assigning work still requires an investment. */
+/** Selection only previews a pairing; assigning work requires an explicit standing order. */
 export function selectResearchTeam(state, ui, teamId) {
   const team=state.teams.find(t=>t.id===teamId);
   if(!team) return {...ui};
@@ -124,11 +124,14 @@ export function researchBoard(state, ui = {}, {icon} = {}) {
 
 function teamResearchControls(state,team,project,icon) {
   const task=team?game.getTeamActivity(state,team.id):null;
-  const work=!team?'点击左侧团队，再选科技安排研制。':task.active?`在研：${task.name} · ${percent(task.progress)}%`:task.currentTurn&&task.kind!=='idle'?`${task.name} · ${task.statusLabel}`:'暂无在研项目，本季可安排研制。';
-  const canInvest=Boolean(team&&project?.selectedTeamId===team.id&&project.canInvest);
-  const note=!project?'选择科技后，可在此投入研制或验收。':project.completed?'成果已生效，可继续安排其他研究。':!team?'先在左侧选择主持团队。':project.progress>=100?'准备已齐备，可择机验收。':project.investedTurn===state.turn?'本科技本季已投入，仍可择机验收。':!task.available?'本组本季已派遣，下季可继续投入。':project.locked?'补齐前置条件后即可研制。':state.money<project.investCost?'内库银两不足，待下季拨款。':task.active&&task.projectId!==project.id?`投入后转研本项；${task.name}保留进度。`:'点击研制，安排本组本季攻关。';
-  const forecast=project&&!project.completed&&team?`推进 ${project.researchChance}% · 顺利 +${project.progressGain}% / 受阻 +${project.failureProgressGain}%`:project?.completed?'已完成验收，成果即刻生效。':project?'选定团队后显示推进胜算。':'选定科技后显示推进胜算。';
-  return `<section class="detail-team" ${team?`data-team-id="${team.id}"`:''} aria-label="技术团队与研究进度"><header class="team-control-heading">${teamPortrait(team,'inline')}<span class="detail-catalogue">技术团队</span><h3 title="${esc(team?.name||'尚未选择团队')}">${esc(team?.name||'尚未选择团队')}</h3><span class="status-badge ${task?.available?'is-ready':'is-invested'}">${esc(task?.statusLabel||'待选择')}</span></header><div class="team-detail-specialties">${(game.SPECIALTIES||[]).map(skill=>`<div class="${project?.specialtyRequirements?.[skill.id]?'is-relevant':''}"><span>${esc(skill.name)}</span><b>${team?number(team.specialties[skill.id]):'—'}</b></div>`).join('')}</div><p class="team-detail-work" title="${esc(work)}">${esc(work)}</p><div class="team-research-progress"><div class="detail-metrics"><span>准备度 <b>${project?`${percent(project.progress)}%`:'—'}</b></span><span>验收胜算 <b>${project?`${project.successChance}%`:'—'}</b></span></div><div class="progress-track"><span style="width:${project?percent(project.progress):0}%"></span></div><p class="detail-forecast" title="${esc(forecast)}">${esc(forecast)}</p><div class="detail-buttons"><button class="small-button primary" data-action="invest" data-id="${esc(project?.id||'')}" data-team-id="${esc(team?.id||'')}" ${canInvest?'':'disabled'}>${project?.completed?'已完成':project?.investedTurn===state.turn?'本季已投入':project?`研制 · ${silver(project.investCost)}两`:'研制'}</button><button class="small-button" data-action="test" data-id="${esc(project?.id||'')}" ${project?.canTest?'':'disabled'}>${project?.completed?'验收已通过':project?`验收 · ${silver(project.testCost)}两`:'验收'}</button></div><p class="research-operation-note" title="${esc(note)}">${esc(note)}</p></div></section>`;
+  const sameProject=Boolean(task?.active&&task.projectId===project?.id);
+  const canInvest=Boolean(team&&project?.selectedTeamId===team.id&&project.canInvest&&!sameProject);
+  const canCancel=Boolean(team&&task?.active&&state.status==='playing'&&!state.pending);
+  const work=!team?'选择团队安排研究；已有准备即可独立验收。':task?.active?`研究目标：${task.name} · ${percent(task.progress)}%`:task?.currentTurn&&task.kind!=='idle'?`${task.name} · ${task.statusLabel}`:'尚未设定研究目标。';
+  const note=!project?'选中科技可设定目标；有准备度即可随时验收。':project.completed?'成果已生效，可继续安排其他研究。':project.progress>=100?'准备已满，自动研究暂停收费；可验收或更换目标。':project.locked?'补齐前置条件后即可安排研究。':!team?'验收无需团队；安排研究请先选择团队。':team.usedTurn===state.turn?'本组本季已营建或操演，下季可安排研究。':sameProject?'季末统一扣款并推进，持续至100%、验收完成或取消。':task?.active?`设为目标后改研本项，${task.name}保留准备度。`:'设定目标不会立即扣款；季末按预计开销统一结算。';
+  const forecast=project&&!project.completed&&team&&project.progress<100?`每季 ${silver(project.investCost)}两 · 推进 ${project.researchChance}%（+${project.progressGain}% / +${project.failureProgressGain}%）`:project?.completed?'已完成验收，成果即刻生效。':project?.progress>=100?'准备已满，本项不再产生科研开销。':project?'选定团队后显示每季开销与推进胜算。':'科研开销在结束本季时支付。';
+  const investLabel=project?.completed?'已完成':sameProject?(task?.queued?'持续研究中':'准备已满'):task?.active?'更换目标':'设为目标';
+  return `<section class="detail-team" ${team?`data-team-id="${team.id}"`:''} aria-label="技术团队与研究进度"><header class="team-control-heading">${teamPortrait(team,'inline')}<span class="detail-catalogue">技术团队</span><h3 title="${esc(team?.name||'尚未选择团队')}">${esc(team?.name||'尚未选择团队')}</h3><span class="status-badge ${task?.available?'is-ready':'is-invested'}">${esc(task?.statusLabel||'待选择')}</span></header><div class="team-detail-specialties">${(game.SPECIALTIES||[]).map(skill=>`<div class="${project?.specialtyRequirements?.[skill.id]?'is-relevant':''}"><span>${esc(skill.name)}</span><b>${team?number(team.specialties[skill.id]):'—'}</b></div>`).join('')}</div><p class="team-detail-work" title="${esc(work)}">${esc(work)}</p><div class="team-research-progress"><div class="detail-metrics"><span>准备度 <b>${project?`${percent(project.progress)}%`:'—'}</b></span><span>验收胜算 <b>${project?`${project.successChance}%`:'—'}</b></span></div><div class="progress-track"><span style="width:${project?percent(project.progress):0}%"></span></div><p class="detail-forecast" title="${esc(forecast)}">${esc(forecast)}</p><div class="detail-buttons"><button class="small-button primary" data-action="invest" data-id="${esc(project?.id||'')}" data-team-id="${esc(team?.id||'')}" ${canInvest?'':'disabled'}>${investLabel}</button>${task?.active?`<button class="small-button cancel-research" data-action="cancel-research" data-team-id="${esc(team?.id||'')}" ${canCancel?'':'disabled'}>取消研究</button>`:''}<button class="small-button" data-action="test" data-id="${esc(project?.id||'')}" ${project?.canTest?'':'disabled'}>${project?.completed?'验收通过':project?`验收 · ${silver(project.testCost)}两`:'验收'}</button></div><p class="research-operation-note" title="${esc(note)}">${esc(note)}</p></div></section>`;
 }
 
 function effectSummary(project) {

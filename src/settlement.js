@@ -25,20 +25,27 @@ export function facilityArt(id) {
   return `<span class="estate-district-thumb" style="--district-x:${district.x}%;--district-y:${district.y}%" aria-hidden="true"></span>`;
 }
 
-export function settlementScene(state, facilities = []) {
+export function settlementScene(state, facilities = [], { revealFacilityId = null } = {}) {
   const built = SETTLEMENT_DISTRICTS.filter(({ id }) => Number(state.facilities?.[id]) >= 1);
   const complete = built.length === SETTLEMENT_DISTRICTS.length;
+  const reveal = built.find(district => district.id === revealFacilityId) || null;
+  const completeImmediately = complete && !reveal;
   const names = Object.fromEntries(facilities.map(facility => [facility.id, facility.name]));
   const definitions = built.map(district => `<mask id="district-${district.id}" maskUnits="userSpaceOnUse" x="0" y="0" width="1586" height="992"><path d="${district.outline}" fill="white" filter="url(#district-edge)"/></mask>`).join('');
-  const layers = complete ? '' : built.map(district => `<image class="estate-district" data-facility="${district.id}" href="${COMPLETE_URL}" width="1586" height="992" mask="url(#district-${district.id})" role="img" aria-label="${escapeHTML(names[district.id] || district.name)}，已建成"/>`).join('');
+  const surroundDefinition = complete && reveal ? `<mask id="district-surround" maskUnits="userSpaceOnUse" x="0" y="0" width="1586" height="992"><rect width="1586" height="992" fill="white"/><path d="${reveal.outline}" fill="black" filter="url(#district-edge)"/></mask>` : '';
+  const surround = complete && reveal ? `<image class="estate-completion-surround" href="${COMPLETE_URL}" width="1586" height="992" mask="url(#district-surround)"/>` : '';
+  // Draw the newest district last so only its construction fades in. The completed
+  // landscape remains masked around it until the reveal has finished.
+  const ordered = [...built.filter(district => district !== reveal), ...(reveal ? [reveal] : [])];
+  const layers = completeImmediately ? '' : ordered.map(district => `<image class="estate-district${district === reveal ? ' is-revealing' : ''}" data-facility="${district.id}" href="${COMPLETE_URL}" width="1586" height="992" mask="url(#district-${district.id})" role="img" aria-label="${escapeHTML(names[district.id] || district.name)}，已建成"/>`).join('');
   const label = `皇家工业苑，已建成${built.length}片建筑群`;
   return `<div class="settlement-scene ${complete ? 'is-complete' : ''}" data-built-count="${built.length}" aria-label="${label}">
     <div class="estate-atmosphere" aria-hidden="true"></div>
     <div class="estate-panorama-frame">
       <svg class="estate-panorama" viewBox="0 0 1586 992" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${label}">
-        <defs><filter id="district-edge" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="3"/></filter>${definitions}</defs>
-        <image class="estate-base" href="${complete ? COMPLETE_URL : UNBUILT_URL}" width="1586" height="992"/>
-        ${layers}
+        <defs><filter id="district-edge" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="3"/></filter>${definitions}${surroundDefinition}</defs>
+        <image class="estate-base" href="${completeImmediately ? COMPLETE_URL : UNBUILT_URL}" width="1586" height="992"/>
+        ${surround}${layers}
       </svg>
     </div>
   </div>`;
