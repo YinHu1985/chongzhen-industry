@@ -9,8 +9,8 @@
 .research-card-art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;object-position:56% 50%;filter:saturate(.77) brightness(1.05);pointer-events:none}
 .research-card::before{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#211913db 0%,#251a1470 55%,#231a1426 100%),linear-gradient(0deg,#17120fe8,transparent 70%);pointer-events:none}
 .research-card h4,.research-card.is-selected h4{color:#f0dfbb;font-size:14px;line-height:1.25;max-width:94%;text-shadow:0 1px 3px #100a07}
-.research-card .research-card-status{color:#ddc9a6;font-size:9px;text-shadow:0 1px 3px #100a07}
-.research-card .research-card-bottom>b{color:#e2c89b;font-size:12px;text-shadow:0 1px 3px #100a07}
+.research-card .research-card-status{color:#ddc9a6;font-size:11px;text-shadow:0 1px 3px #100a07}
+.research-card .research-card-bottom>b{color:#e2c89b;font-size:14px;text-shadow:0 1px 3px #100a07}
 .research-card .research-card-progress{height:2px;background:#b9985c2e;z-index:1}
 .research-card .research-card-progress>i{background:#b58c55}
 .research-card:hover{background:#30271f;border-color:#c2a579;box-shadow:inset 0 0 0 1px #c7aa6d66}
@@ -50,8 +50,8 @@
 .team-card-label{flex:1;min-width:0}
 .team-card-identity .team-card-heading{display:block;position:relative}
 .team-card-identity .team-card-heading>strong{display:block;font-size:12px;line-height:16px}
-.team-card-identity .team-card-heading>small{display:block;font-size:7px;line-height:11px}
-.team-card-identity .team-card-work{margin:2px 0 0;font-size:9px;line-height:13px}
+.team-card-identity .team-card-heading>small{display:block;font-size:10px;line-height:14px}
+.team-card-identity .team-card-work{margin:2px 0 0;font-size:11px;line-height:15px}
 .research-team-card.is-selected .team-portrait{border-color:#c5a46b}
 .team-control-heading .team-portrait{margin-right:1px}
 .team-card>header{min-width:0;gap:13px;margin-bottom:15px}
@@ -59,7 +59,7 @@
 .team-card>header h3{overflow-wrap:anywhere;line-height:1.45}
 .facility-team,.training-team{display:flex;align-items:center;gap:7px;min-width:0}
 .facility-team>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.training-team{margin:10px 0 8px;font-size:11px;color:#67462e}
+.training-team{margin:10px 0 8px;font-size:13px;color:#67462e}
 .team-dismiss-heading{display:flex;align-items:center;gap:16px;margin:0 0 18px}
 .team-dismiss-heading h2{margin:0;font-size:23px}
 .victory-art{display:block;width:100%;height:155px;object-fit:cover;object-position:50% 40%;border:1px solid #a3814a;margin:0 0 18px;filter:saturate(.8) brightness(.85)}
@@ -89,26 +89,26 @@
  .team-portrait--inline{width:23px;height:24px}
  .team-portrait--large{width:62px;height:68px}
  .team-card-identity .team-card-heading>strong{font-size:11px}
- .team-card-identity .team-card-work{font-size:8px}
+ .team-card-identity .team-card-work{font-size:10px}
  .milestone-mark>.icon{width:18px;height:23px}
 }
 @media(max-height:850px) and (min-width:761px){
- .research-card-grid{grid-auto-rows:66px}
- .research-card{height:66px;padding:6px 8px}
+ .research-card-grid{grid-auto-rows:72px}
+ .research-card{height:72px;padding:6px 8px}
  .research-card h4{font-size:13px}
 }
 @media(max-width:760px){
  .research-card-grid{grid-auto-rows:72px}
  .research-card{height:72px;padding:6px}
  .research-card h4{font-size:12px}
- .research-card .research-card-status{font-size:8px}
- .research-card .research-card-bottom>b{font-size:10px}
+ .research-card .research-card-status{font-size:10px}
+ .research-card .research-card-bottom>b{font-size:12px}
  .team-card-identity{display:grid;grid-template-columns:27px minmax(0,1fr);gap:5px;align-items:start}
  .team-portrait{width:27px;height:34px}
  .team-portrait--inline{width:23px;height:24px}
  .team-portrait--large{width:54px;height:60px}
  .team-card-identity .team-card-heading>strong{font-size:10px;line-height:14px}
- .team-card-identity .team-card-work{font-size:8px}
+ .team-card-identity .team-card-work{font-size:10px}
  .milestone-mark>.icon{width:17px;height:21px}
  .team-dismiss-heading{gap:10px}
  .team-dismiss-heading h2{font-size:19px}
