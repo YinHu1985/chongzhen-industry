@@ -27,6 +27,7 @@ test('a validated imported campaign remains separate until explicitly saved', as
   const original = createGame({ maxTurns: 24, seed: 11 });
   const current = slot(JSON.stringify({ state: original }));
   let imported = createGame({ maxTurns: 64, seed: 99 });
+  if (imported.pending?.kind === 'event') imported = performAction(imported, { type: 'acknowledgeEvent' }).state;
   imported = performAction(imported, { type: 'build', id: 'workshop' }).state;
   const raw = JSON.stringify({ state: imported });
   const candidate = await readSaveFile(new Blob([raw], { type: 'application/json' }));
@@ -47,29 +48,37 @@ test('invalid, empty and oversized imports are rejected without reading oversize
   await assert.rejects(readSaveFile(new Blob(['{}'])), /不兼容|不完整/);
 });
 
-test('an existing browser slot migrates v4 in memory without overwriting the source', () => {
-  const legacy = createGame({ seed: 812 });
-  legacy.version = 4; delete legacy.enemyStrength; delete legacy.warfare;
-  delete legacy.treasury; delete legacy.lastSettlement;
-  legacy.plannedEvents = [1, 2, 3].map(stage => ({ id: `crisis_${stage}`, stage,
-    turn: stage * 6, title: '旧军报', description: '地方请求援军。' }));
-  const raw = JSON.stringify({ state: legacy });
-  const existing = slot(raw), restored = loadLocalSave(existing);
-  assert.equal(restored.version, 7); assert.equal(restored.status, 'playing');
-  assert.deepEqual(restored.projects, legacy.projects);
-  assert.equal(existing.raw, raw); assert.equal(existing.writes, 0);
-  storeLocalSave(existing, restored);
-  assert.deepEqual(loadLocalSave(existing), restored); assert.equal(existing.writes, 1);
+test('the event-history save slot rejects old formats without rewriting their source', () => {
+  assert.equal(SAVE_KEY, 'chongzhen-industry.save.v10');
+  for (const version of [4, 5, 6, 7, 8, 9]) {
+    const legacy = { ...createGame(), version };
+    const raw = JSON.stringify({ state: legacy });
+    const existing = slot(raw);
+    assert.throws(() => loadLocalSave(existing), /不兼容|不完整/);
+    assert.equal(existing.raw, raw);
+    assert.equal(existing.writes, 0);
+  }
 });
 
-test('the original browser slot also accepts v5 and starts finance history only after migration', () => {
-  const legacy = createGame({ seed: 441 });
-  legacy.version = 5; legacy.enemyStrength = 3; delete legacy.treasury; delete legacy.lastSettlement;
-  const raw = JSON.stringify({ state: legacy });
-  const existing = slot(raw), restored = loadLocalSave(existing);
-  assert.equal(restored.version, 7); assert.equal(restored.money, legacy.money);
-  assert.equal(restored.enemyStrength, .70);
-  assert.deepEqual(restored.treasury, { entries: [], nextId: 1 });
-  assert.equal(restored.lastSettlement, null);
-  assert.equal(existing.raw, raw); assert.equal(existing.writes, 0);
+test('reading and confirming a saved event preserve its already-issued reward', async () => {
+  let state;
+  for (let seed = 1; seed <= 1000; seed++) {
+    const candidate = createGame({ seed });
+    if (candidate.events.history[0]?.eventId === 'corrupt_official') { state = candidate; break; }
+  }
+  assert.ok(state);
+  const storage = slot();
+  storeLocalSave(storage, state);
+  const raw = storage.raw, imported = await readSaveFile(new Blob([raw], { type: 'application/json' }));
+  assert.deepEqual(imported, state);
+  assert.deepEqual(loadLocalSave(storage), state);
+  assert.equal(storage.raw, raw); assert.equal(storage.writes, 1);
+  const acknowledged = performAction(imported, { type: 'acknowledgeEvent' });
+  assert.equal(acknowledged.error, undefined);
+  storeLocalSave(storage, acknowledged.state);
+  const restored = loadLocalSave(storage);
+  assert.equal(restored.pending, null);
+  assert.equal(restored.money, state.money);
+  assert.deepEqual(restored.treasury, state.treasury);
+  assert.deepEqual(restored.events, state.events);
 });

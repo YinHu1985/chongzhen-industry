@@ -1,4 +1,4 @@
-import { createGame, performAction, getProjectInfo, getFacilityInfo, getTrainingInfo, getFinanceInfo } from '../../src/game.js';
+import { createGame, performAction, getProjectInfo, getFacilityInfo, getTrainingInfo, getFinanceInfo, getRecruitmentInfo } from '../../src/game.js';
 
 export function act(state, action) {
   const result = performAction(state, action);
@@ -10,23 +10,22 @@ export function settleRescue(state) {
 }
 export function finishSeason(state) {
   state = act(state, {type:'endTurn'});
-  if (state.pending?.kind === 'event') {
-    const choice = state.pending.choices.find(choice => choice.id === 'supply' && !choice.disabled);
-    state = act(state, {type:'event',choice:choice?.id || 'ignore'});
-  }
+  if (state.pending?.kind === 'event') state = act(state, {type:'acknowledgeEvent'});
   return state;
 }
-const BASE = ['@workshop','survey','standards','school','water_power','bloomery','drill_manual','lathe','civil_works','@drill_ground','officer_school','logistics','@machine_shop'];
+const BASE = ['@workshop','survey','standards','school','water_power','bloomery','drill_manual','@workshop_2','cold_arms','lathe','civil_works','@drill_ground','officer_school','logistics','@machine_shop','boring_machine','planer','quality_control','arsenal_workshops','@machine_shop_2','standard_tools','mass_production'];
+const FIREARMS = ['powder_supply','@arsenal','paper_cartridges','@arsenal_2','muskets','@arsenal_3','percussion_caps','percussion_musket','rifling','@arsenal_4','minie_ammo','minie_rifle'];
+const STEEL = ['@furnace','iron','@furnace_2','wrought_iron','crucible_steel','rolling_mill'];
 const PLANS = {
-  cold:[...BASE,'cold_arms','arsenal_workshops','boring_machine','quality_control','mass_production','standard_tools'],
-  minie:[...BASE,'arsenal_workshops','boring_machine','quality_control','powder_supply','paper_cartridges','rifling','percussion_caps','minie_ammo','mass_production','minie_rifle'],
-  cuirassier:[...BASE,'@furnace','wrought_iron','crucible_steel','cuirassier','iron','arsenal_workshops','boring_machine','quality_control','mass_production','standard_tools'],
-  breech:[...BASE,'arsenal_workshops','boring_machine','quality_control','powder_supply','paper_cartridges','rifling','percussion_caps','@furnace','wrought_iron','crucible_steel','rolling_mill','precision_tools','cartridge_cases','breech_actions','metal_cartridges','mass_production','breech_rifle'],
+  cold:[...BASE],
+  minie:[...BASE,...FIREARMS],
+  cuirassier:[...BASE,...STEEL,'@steel_armory','cuirassier'],
+  breech:[...BASE,...FIREARMS,...STEEL,'@machine_shop_3','precision_tools','@arsenal_5','breech_actions','breech_rifle','@metal_ammo_workshop','cartridge_cases','metal_cartridges'],
 };
 
 // Finance every building, research attempt, trial and training session through
 // public actions. No completed technologies, funds, teams or progress are injected.
-export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStrength=1,onAction,deployFronts=null,deferProject=null,deferUntil=0}={}) {
+export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStrength=1,onAction,deployFronts=null,deferProject=null,deferUntil=0,recruitTo=3}={}) {
   let state=createGame({seed,maxTurns,enemyStrength}), beforeDeferredTest=null;
   const history=[], priorities=PLANS[doctrine];
   if (!priorities) throw new Error(`Unknown campaign ${doctrine}`);
@@ -35,8 +34,29 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStren
     history.push({turn:state.turn,action});
     onAction?.(state,action);
     if(state.pending?.kind==='rescue') take({type:'rescue',accept:state.money>=state.pending.cost+getFinanceInfo(state).expenses});
+    if(state.pending?.kind==='event') take({type:'acknowledgeEvent'});
   };
+  if(state.pending?.kind==='event')take({type:'acknowledgeEvent'});
   take({type:'selectDoctrine',id:doctrine});
+  let refreshedTurn = 0;
+  const recruitOne=()=>{
+    if(state.teams.length>=recruitTo)return false;
+    const specialties=['mechanics','metallurgy','foreign','management'];
+    const best=Object.fromEntries(specialties.map(id=>[id,Math.max(...state.teams.map(team=>team.specialties[id]))]));
+    const improvement=team=>specialties.reduce((sum,id)=>sum+Math.max(0,team.specialties[id]-best[id]),0);
+    const candidates=()=>[...getRecruitmentInfo(state).candidates].sort((a,b)=>improvement(b)-improvement(a)||a.hireCost-b.hireCost);
+    let candidate=candidates()[0];
+    // Keep construction and already reserved research financed while filling the
+    // starting roster's gaps through real candidate refresh and hiring actions.
+    const reserve=state.facilities.workshop?10_000:23_000;
+    const available=state.money-getFinanceInfo(state).expenses;
+    const refreshCost=getRecruitmentInfo(state).refreshCost;
+    if((!candidate||improvement(candidate)<25)&&refreshedTurn!==state.turn&&available>=reserve+refreshCost+9_000){
+      take({type:'refreshCandidates'});refreshedTurn=state.turn;candidate=candidates()[0];
+    }
+    if(!candidate||!candidate.canHire||state.money-candidate.hireCost<getFinanceInfo(state).expenses+reserve)return false;
+    take({type:'hireTeam',teamId:candidate.id});return true;
+  };
   const trainOne=()=>{
     const branch=doctrine==='cuirassier'?'cavalry':'infantry';
     const option=[branch,'drill','coordination'].map(id=>({id,...getTrainingInfo(state,id)})).filter(i=>i.canTrain).sort((a,b)=>a.current-b.current)[0];
@@ -44,6 +64,7 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStren
     take({type:'train',branch:option.id});return true;
   };
   while(state.status==='playing') {
+    while(recruitOne()) { /* expand the two-team opening using earned silver */ }
     let saving=false;
     for(let sweep=0;sweep<3&&!saving&&state.status==='playing';sweep++) {
       let changed=false;
@@ -78,7 +99,6 @@ export function playCampaign(doctrine='cold', {seed=12345,maxTurns=24,enemyStren
     }
     if(state.status==='playing') {
       take({type:'endTurn'});
-      if(state.pending?.kind==='event')take({type:'event',choice:state.pending.choices.find(c=>c.id==='supply'&&!c.disabled)?.id||'ignore'});
     }
   }
   return {state,history,priorities,beforeDeferredTest};

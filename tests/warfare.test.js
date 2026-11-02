@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, performAction, getCombatRating, getGoals, getCampaignOutcome, getFinanceInfo, PROJECTS } from '../src/game.js';
-import { FRONTS, createWarfare, strengthMultiplier, isEnemyStrength, normalizeEnemyStrength } from '../src/warfare.js';
+import { createGame, performAction, getCombatRating, getGoals, getCampaignOutcome, getFinanceInfo, PROJECTS, DOCTRINES } from '../src/game.js';
+import { FRONTS, createWarfare, frontStartTurn, strengthMultiplier, isEnemyStrength, normalizeEnemyStrength } from '../src/warfare.js';
 import { act, playCampaign } from './helpers/campaign.mjs';
 
-const ids = ['wokou', 'li', 'qing'];
+const ids = ['wokou', 'bailian', 'li', 'qing'];
 // Preserve the original 0.70× balance for combat fixtures unrelated to difficulty input.
 function fixture({ turn = 18, maxTurns = 24, enemyStrength = .70, trained = true } = {}) {
   const state = createGame({ maxTurns, enemyStrength });
@@ -21,19 +21,47 @@ function deploy(state, id, target, battleCap = state.warfare.fronts[id].battleCa
 }
 function front(state, id) { return getCombatRating(state).fronts.find(item => item.id === id); }
 
-for (const maxTurns of [24, 40, 64]) test(`${maxTurns} seasons reveal each enemy only at its quarter boundary`, () => {
+for (const maxTurns of [24, 40, 64]) test(`${maxTurns} seasons start with coastal raiders and reveal each later enemy at its quarter boundary`, () => {
   const fresh = createGame({ maxTurns });
-  assert.deepEqual(getCombatRating(fresh).fronts, []);
-  assert.deepEqual(getGoals(fresh), []);
+  assert.deepEqual(getCombatRating(fresh).fronts.map(item => item.id), ['wokou']);
+  assert.deepEqual(getGoals(fresh).map(item => item.id), ['wokou']);
+  assert.equal(fresh.warfare.fronts.wokou.lastBattle, null);
+  assert.deepEqual(FRONTS.map(item => item.id), ids);
+  assert.equal(frontStartTurn(maxTurns, FRONTS[0]), 1);
   for (let stage = 1; stage <= 3; stage++) {
     const revealTurn = Math.ceil(maxTurns * stage / 4);
     const state = fixture({ maxTurns, turn: revealTurn - 1 });
-    assert.deepEqual(getCombatRating(state).fronts.map(item => item.id), ids.slice(0, stage - 1));
+    assert.deepEqual(getCombatRating(state).fronts.map(item => item.id), ids.slice(0, stage));
+    assert.ok(performAction(state, { type: 'configureFront', id: ids[stage], target: 1000, battleCap: 1000 }).error);
     const next = act(state, { type: 'endTurn' });
     assert.equal(next.turn, revealTurn);
-    assert.deepEqual(getCombatRating(next).fronts.map(item => item.id), ids.slice(0, stage));
-    assert.equal(next.warfare.fronts[ids[stage - 1]].lastBattle, null, 'a newly visible enemy waits until the player can deploy');
+    assert.deepEqual(getCombatRating(next).fronts.map(item => item.id), ids.slice(0, stage + 1));
+    assert.deepEqual(next.lastSettlement.newFronts, [ids[stage]]);
+    assert.equal(next.warfare.fronts[ids[stage]].lastBattle, null, 'a newly visible enemy waits until the player can deploy');
+    const deployed = deploy(next, ids[stage], 1000);
+    assert.equal(deployed.warfare.fronts[ids[stage]].assigned, 1000);
   }
+});
+
+test('the default opening allows a real coastal deployment with casualties and industrial replacement in the first season', () => {
+  let state = createGame();
+  assert.equal(state.enemyStrength, 1);
+  assert.equal(state.warfare.fronts.wokou.troops, 400);
+  assert.equal(state.warfare.fronts.bailian.troops, 0);
+  state = deploy(state, 'wokou', 3000);
+  const before = getCombatRating(state), forecast = front(state, 'wokou').forecast;
+  assert.ok(forecast.playerLosses > 0);
+  assert.ok(forecast.enemyLosses > forecast.enemyReinforcements);
+  assert.ok(forecast.playerLosses <= before.reinforcements, 'the introductory fight is sustainable at baseline difficulty with untrained opening equipment');
+  const next = act(state, { type: 'endTurn' }), report = next.warfare.fronts.wokou.lastBattle;
+  assert.equal(next.turn, 2);
+  assert.equal(next.status, 'playing');
+  assert.equal(report.turn, 1);
+  assert.equal(report.playerLosses, forecast.playerLosses);
+  assert.equal(report.reinforcements, report.playerLosses);
+  assert.equal(next.warfare.fronts.wokou.assigned, 3000);
+  assert.equal(getCombatRating(next).totalTroops, before.totalTroops - report.playerLosses + before.reinforcements);
+  assert.deepEqual(next.lastSettlement.battles.map(battle => battle.id), ['wokou']);
 });
 
 test('deploying and withdrawing troops conserves the army and remembers its standing orders', () => {
@@ -72,7 +100,7 @@ test('invalid deployment orders neither mutate the state nor consume randomness'
     assert.equal(JSON.stringify(state), before);
   }
   const dormant = createGame();
-  assert.ok(performAction(dormant, { type: 'configureFront', id: 'wokou', target: 1000, battleCap: 1000 }).error);
+  for (const id of ['bailian', 'li', 'qing']) assert.ok(performAction(dormant, { type: 'configureFront', id, target: 1000, battleCap: 1000 }).error);
 });
 
 test('only the enemy commitment cap enters combat even when its total force is much larger', () => {
@@ -89,9 +117,9 @@ test('only the enemy commitment cap enters combat even when its total force is m
   assert.equal(next.warfare.fronts.li.troops, 100_000 - report.enemyLosses + report.enemyReinforcements);
 });
 
-test('three fronts share one reinforcement pool and repeat combat without fresh orders', () => {
+test('four fronts share one reinforcement pool and repeat combat without fresh orders', () => {
   let state = fixture();
-  state.warfare.reserve = 15_000;
+  state.warfare.reserve = 20_000;
   for (const id of ids) state = deploy(state, id, 5000);
   const before = getCombatRating(state), original = JSON.stringify(state);
   let next = act(state, { type: 'endTurn' });
@@ -147,6 +175,30 @@ test('missing cavalry and artillery gives the Qing additional combat advantages'
   assert.ok(unsupported.forecast.playerLosses > supported.forecast.playerLosses);
 });
 
+test('the White Lotus front is a real step above coastal raiders while Li remains harder at both initial and full commitments', () => {
+  for (const doctrine of DOCTRINES) for (const scenario of ['initial', 'full-cap']) {
+    for (const [artillery, cavalry] of [[100, 100], [0, 100], [100, 0], [0, 0]]) {
+      let state = fixture({ enemyStrength: 1 });
+      state.doctrine = doctrine.id;
+      state.army.artillery = artillery; state.army.cavalry = cavalry;
+      state.warfare.reserve = 400_000;
+      for (const definition of FRONTS) {
+        if (scenario === 'full-cap') state.warfare.fronts[definition.id].troops = Math.max(definition.initialTroops, definition.battleCap * 2);
+        state = deploy(state, definition.id, 100_000);
+      }
+      const coastal = front(state, 'wokou'), whiteLotus = front(state, 'bailian'), rebels = front(state, 'li');
+      const context = `${doctrine.id}/${scenario}/artillery:${artillery}/cavalry:${cavalry}`;
+      assert.ok(whiteLotus.forecast.playerLosses > coastal.forecast.playerLosses, `${context}: White Lotus should inflict more casualties than the opening raiders`);
+      assert.ok(whiteLotus.forecast.enemyReinforcements > coastal.forecast.enemyReinforcements, `${context}: White Lotus recruits faster than the opening raiders`);
+      assert.ok(rebels.forecast.playerLosses > whiteLotus.forecast.playerLosses, `${context}: Li losses ${rebels.forecast.playerLosses} must exceed White Lotus losses ${whiteLotus.forecast.playerLosses}`);
+      assert.ok(rebels.forecast.enemyReinforcements > whiteLotus.forecast.enemyReinforcements, `${context}: Li reinforcement pressure must exceed White Lotus`);
+      assert.equal(rebels.assigned, whiteLotus.assigned, 'the comparison uses the same player force');
+      assert.equal(rebels.battleCap, FRONTS.find(definition => definition.id === 'li').battleCap);
+      assert.equal(whiteLotus.battleCap, FRONTS.find(definition => definition.id === 'bailian').battleCap);
+    }
+  }
+});
+
 test('inadequate fighting power and depleted reserves cause actual troop decline despite automatic recruitment', () => {
   let state = fixture({ turn: 6, enemyStrength: 10, trained: false });
   state.warfare.reserve = 5000;
@@ -161,7 +213,7 @@ test('inadequate fighting power and depleted reserves cause actual troop decline
 
 test('overwhelming victories cannot erase enemy remnants and final victory waits until seasonal settlement', () => {
   let state = fixture({ turn: 24, enemyStrength: 1 });
-  state.warfare.reserve = 300_000;
+  state.warfare.reserve = 400_000;
   for (const definition of FRONTS) {
     state.warfare.fronts[definition.id].troops = definition.minTroops + 1000;
     state = deploy(state, definition.id, 100_000, definition.maxTroops);
@@ -181,7 +233,7 @@ test('overwhelming victories cannot erase enemy remnants and final victory waits
 });
 
 test('crossing any enemy collapse threshold immediately ends the campaign with ordered endings', () => {
-  for (const failing of [['wokou'], ['qing', 'wokou'], ['li', 'qing', 'wokou']]) {
+  for (const failing of [['wokou'], ['bailian', 'wokou'], ['qing', 'bailian', 'wokou'], ['li', 'qing', 'bailian', 'wokou']]) {
     let state = fixture();
     for (const definition of FRONTS) if (failing.includes(definition.id)) state.warfare.fronts[definition.id].troops = definition.defeatThreshold;
     const turn = state.turn, money = state.money, netIncome = getFinanceInfo(state).netIncome;
@@ -198,9 +250,9 @@ test('crossing any enemy collapse threshold immediately ends the campaign with o
 
 function sustainedFrontFixture() {
   let state = fixture({ turn: 24 });
-  state.warfare.reserve = 300_000;
+  state.warfare.reserve = 400_000;
   for (const definition of FRONTS) {
-    state.warfare.fronts[definition.id].troops = { wokou: 15_000, li: 100_000, qing: 80_000 }[definition.id];
+    state.warfare.fronts[definition.id].troops = { wokou: 1500, bailian: 30_000, li: 100_000, qing: 80_000 }[definition.id];
     state = deploy(state, definition.id, 100_000);
   }
   return state;
@@ -230,7 +282,7 @@ test('a pacified front at its reinforcement floor does not prevent stalemate on 
 });
 
 test('already pacified fronts cannot steal the ending from the actually collapsed front', () => {
-  for (const failing of ['qing', 'wokou']) {
+  for (const failing of ['qing', 'bailian', 'wokou']) {
     let state = sustainedFrontFixture();
     for (const definition of FRONTS) if (definition.id !== failing) state.warfare.fronts[definition.id].troops = definition.minTroops;
     state = deploy(state, failing, 0);
@@ -266,10 +318,10 @@ test('reserve-funded replacement cannot disguise losses above recurring industri
 
 test('sufficient shared industrial output sustains every line regardless of uneven garrison targets', () => {
   let state = fixture({ turn: 24 });
-  state.warfare.reserve = 136_000;
+  state.warfare.reserve = 156_000;
   for (const id of ids) {
-    state.warfare.fronts[id].troops = { wokou: 10_000, li: 24_000, qing: 36_000 }[id];
-    state = deploy(state, id, { wokou: 6000, li: 100_000, qing: 30_000 }[id]);
+    state.warfare.fronts[id].troops = { wokou: 1000, bailian: 15_000, li: 24_000, qing: 36_000 }[id];
+    state = deploy(state, id, { wokou: 6000, bailian: 20_000, li: 100_000, qing: 30_000 }[id]);
   }
   assert.equal(state.warfare.reserve, 0);
   const before = getCombatRating(state);
@@ -289,8 +341,8 @@ test('sufficient shared industrial output sustains every line regardless of unev
 
 test('expanding one garrison uses surplus after all current battle losses are replaced', () => {
   let state = fixture({ turn: 18 });
-  state.warfare.reserve = 136_000;
-  for (const id of ids) state = deploy(state, id, { wokou: 6000, li: 100_000, qing: 30_000 }[id]);
+  state.warfare.reserve = 156_000;
+  for (const id of ids) state = deploy(state, id, { wokou: 6000, bailian: 20_000, li: 100_000, qing: 30_000 }[id]);
   state = deploy(state, 'li', 300_000);
   const before = getCombatRating(state);
   const losses = before.fronts.reduce((sum, item) => sum + item.forecast.playerLosses, 0);
@@ -298,6 +350,7 @@ test('expanding one garrison uses surplus after all current battle losses are re
   assert.equal(state.warfare.reserve, 0);
   const next = act(state, { type: 'endTurn' });
   assert.equal(next.warfare.fronts.wokou.assigned, 6000);
+  assert.equal(next.warfare.fronts.bailian.assigned, 20_000);
   assert.equal(next.warfare.fronts.qing.assigned, 30_000);
   assert.equal(next.warfare.fronts.li.assigned, 100_000 + before.reinforcements - losses);
   assert.equal(next.warfare.reserve, 0);
@@ -320,19 +373,28 @@ function plannedDeployment(state) {
   ];
 }
 
-test('the 0.70× 24-season cold army campaign survives using financed public actions and recurring deployment', () => {
-  const { state, history } = playCampaign('cold', { enemyStrength: .70, deployFronts: plannedDeployment });
-  assert.equal(state.enemyStrength, .70);
+test('the 0.50× 24-season cold army campaign survives after financing a recruit from the two-team opening', () => {
+  const { state, history } = playCampaign('cold', { enemyStrength: .50, deployFronts: plannedDeployment });
+  assert.equal(state.enemyStrength, .50);
   assert.ok(['won', 'stalemate'].includes(state.status), 'ongoing research advances at season end, so survival may remain a stalemate in the shortest campaign');
   assert.equal(state.turn, 24);
   assert.ok(history.some(({action}) => action.type === 'configureFront'));
+  assert.ok(history.some(({action}) => action.type === 'hireTeam'));
+  assert.ok(state.events.history.length > 0, 'the public campaign keeps random events enabled');
+  assert.equal(history.filter(({action}) => action.type === 'acknowledgeEvent').length, state.events.history.length);
   assert.ok(getCombatRating(state).fronts.every(item => item.done || (item.lastBattle.sustainable && item.lastBattle.enemyDeclining)));
 });
 
-for (const [doctrine, maxTurns] of [['cold', 40], ['minie', 40], ['cuirassier', 40], ['breech', 64]]) test(`a ${maxTurns}-season ${doctrine} campaign can win through public research, training and deployment`, () => {
-  const { state } = playCampaign(doctrine, { maxTurns, enemyStrength: .70, deployFronts: plannedDeployment });
+for (const [doctrine, maxTurns] of [['cold', 40], ['minie', 64], ['cuirassier', 64], ['breech', 64]]) test(`a default-strength ${maxTurns}-season ${doctrine} campaign can win through public hiring, research, training and deployment`, () => {
+  const { state, history } = playCampaign(doctrine, { maxTurns, deployFronts: plannedDeployment });
+  assert.equal(state.enemyStrength, 1);
+  assert.ok(history.some(({action}) => action.type === 'hireTeam'), 'additional staff must be hired through the public action');
+  assert.ok(state.events.history.length > 0, 'the public campaign retains its natural event rolls');
+  assert.equal(history.filter(({action}) => action.type === 'acknowledgeEvent').length, state.events.history.length, 'every event is acknowledged through the public action');
   assert.equal(state.status, 'won');
   assert.equal(state.turn, maxTurns);
+  const capstone = {cold:'mass_production', minie:'minie_rifle', cuirassier:'cuirassier', breech:'metal_cartridges'}[doctrine];
+  assert.equal(state.projects[capstone].completed, true, `${doctrine} reaches its actual advanced research group`);
   assert.ok(getGoals(state).every(goal => goal.done));
 });
 

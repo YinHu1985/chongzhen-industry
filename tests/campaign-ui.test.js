@@ -4,12 +4,16 @@ import { createGame, getCombatRating, performAction } from '../src/game.js';
 import { combatPanel, enemyStrengthSelector } from '../src/campaign-ui.js';
 
 function act(state, action) {
+  if (state.pending?.kind === 'event' && action.type !== 'acknowledgeEvent') {
+    state = act(state, { type: 'acknowledgeEvent' });
+  }
   const result = performAction(state, action);
   assert.equal(result.error, undefined);
   return result.state;
 }
 function advance(state, turn) {
   while (state.turn < turn) state = act(state, { type: 'endTurn' });
+  if (state.pending?.kind === 'event') state = act(state, { type: 'acknowledgeEvent' });
   return state;
 }
 
@@ -36,26 +40,31 @@ test('new-game difficulty offers precise direct coefficients with matching range
   }
 });
 
-test('prewar screen shows supply preparation without revealing any enemy or orders', () => {
+test('the opening screen shows only coastal raiders and immediately available deployment orders', () => {
   const state = createGame({ enemyStrength: 2.56 });
   const html = combatPanel(state);
-  assert.match(html, /边境暂宁/);
+  assert.match(html, /倭寇/);
+  assert.match(html, /data-front="wokou"/);
+  assert.match(html, /data-front-orders="wokou"/);
   assert.match(html, /敌军战斗力 ×2\.56/);
   assert.doesNotMatch(html, / \/ 10 ·/);
   assert.match(html, /每季新增补充/);
   assert.match(html, /预备兵 8,000 人/);
-  assert.doesNotMatch(html, /倭寇|流寇|李自成|清军|data-front-orders|NaN|undefined/);
+  assert.doesNotMatch(html, /白莲|闯王军|流寇|李自成|清军|暂无可部署战线|NaN|undefined/);
+  assert.equal((html.match(/data-front="/g) || []).length, 1);
 });
 
 test('revealed fronts expose actual troops and persistent editable orders, without future enemies', () => {
   let state = advance(createGame(), 6);
   let html = combatPanel(state);
   assert.match(html, /data-front="wokou"/);
-  assert.doesNotMatch(html, /流寇|李自成|清军|data-front="li"|data-front="qing"/);
+  assert.match(html, /data-front="bailian"/);
+  assert.match(html, /白莲教/);
+  assert.doesNotMatch(html, /闯王军|流寇|李自成|清军|data-front="li"|data-front="qing"/);
   assert.match(html, /尚未出兵/);
   assert.match(html, /name="target"[^>]*value="0"/);
-  assert.match(html, /name="battleCap"[^>]*value="6000"/);
-  state = act(state, { type: 'configureFront', id: 'wokou', target: 4000, battleCap: 2000 });
+  assert.match(html, /name="battleCap"[^>]*value="5500"/);
+  state = act(state, { type: 'configureFront', id: 'bailian', target: 4000, battleCap: 2000 });
   html = combatPanel(state);
   assert.match(html, /驻军 <b>4,000<\/b>/);
   assert.match(html, /name="target"[^>]*value="4000"/);
@@ -65,13 +74,25 @@ test('revealed fronts expose actual troops and persistent editable orders, witho
   assert.doesNotMatch(html, /NaN|undefined/);
 });
 
+test('the displayed front names advance from raiders to White Lotus, the Chuang army and Qing in stage order', () => {
+  let state = createGame();
+  const expected = ['倭寇', '白莲教', '闯王军', '清军'];
+  for (const [index, turn] of [1, 6, 12, 18].entries()) {
+    state = advance(state, turn);
+    const html = combatPanel(state);
+    const headings = [...html.matchAll(/class="warfront-heading"[\s\S]*?<h4>([^<]+)<\/h4>/g)].map(match => match[1]);
+    assert.deepEqual(headings, expected.slice(0, index + 1));
+    assert.equal((html.match(/data-front-orders="/g) || []).length, index + 1);
+  }
+});
+
 test('last seasonal report is retained alongside the next forecast and ended orders are disabled', () => {
-  let state = advance(createGame(), 6);
+  let state = createGame();
   state = act(state, { type: 'configureFront', id: 'wokou', target: 4000, battleCap: 2000 });
   state = act(state, { type: 'endTurn' });
   const front = getCombatRating(state).fronts[0];
   let html = combatPanel(state);
-  assert.match(html, /第 6 季战报/);
+  assert.match(html, /第 1 季战报/);
   assert.match(html, /name="target"[^>]*value="4000"/);
   assert.match(html, /name="battleCap"[^>]*value="2000"/);
   assert.match(html, /实际补员/);
@@ -85,18 +106,18 @@ test('last seasonal report is retained alongside the next forecast and ended ord
 });
 
 test('suppressed enemies at their replenished floor show a holding status, while equal unsuppressed armies stay level', () => {
-  let state = advance(createGame(), 6);
+  let state = createGame();
   for (const project of Object.values(state.projects)) Object.assign(project, { completed: true, progress: 100 });
   for (const branch of Object.keys(state.army)) state.army[branch] = 100;
-  state = act(state, { type: 'configureFront', id: 'wokou', target: 4000, battleCap: 6000 });
-  state.warfare.fronts.wokou.troops = 1082;
+  state = act(state, { type: 'configureFront', id: 'wokou', target: 4000, battleCap: 600 });
+  state.warfare.fronts.wokou.troops = 107;
   let front = getCombatRating(state).fronts[0];
   assert.equal(front.forecast.enemyLosses, front.forecast.enemyReinforcements);
   let html = combatPanel(state);
   assert.match(html, /敌势已压在平定线内 · 维持当前防务/);
   assert.doesNotMatch(html, /敌军仍在增长/);
-  state.warfare.fronts.wokou.troops = 3500;
-  state.warfare.fronts.wokou.battleCap = 375;
+  state.warfare.fronts.wokou.troops = 400;
+  state.warfare.fronts.wokou.battleCap = 34;
   front = getCombatRating(state).fronts[0];
   assert.equal(front.forecast.enemyLosses, front.forecast.enemyReinforcements);
   html = combatPanel(state);

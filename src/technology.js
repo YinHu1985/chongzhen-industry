@@ -129,7 +129,7 @@ const CATALOG = [
   project('lathe', '初代金属车床', 'machinery', 2, ['standards'], {
     prerequisiteAny: ['iron', 'coke_furnace'],
     description: '金属车床利用工件旋转与刀具进给，加工轴、螺纹等具有回转形状的零件。',
-    benefits: '解锁军器工场，以及镗床、刨床与质量检验科技。', tags: ['母机', '加工'], transfers: { civil_works: 10 },
+    benefits: '解锁机械工场，以及镗床、刨床与质量检验科技。', tags: ['母机', '加工'], transfers: { civil_works: 10 },
     technical: '刀架和导轨约束刀具运动，减少完全凭手工控制带来的差异；机床刚性、磨损与测量水平共同影响精度。',
     historical: '18世纪末至19世纪初，莫兹利等人改进金属车床和螺纹加工设备，推动机床成为机器制造的基础。', source: SOURCES.machineTools,
   }),
@@ -349,7 +349,7 @@ const CATALOG = [
   project('joint_trials', '新军守京', 'army', 8, ['mass_production', 'logistics', 'officer_school'], {
     layoutPrerequisites: ['minie_rifle', 'minie_ammo', 'napoleon_gun', 'artillery_supply', 'armstrong_gun', 'rifled_shells', 'breech_rifle', 'metal_cartridges'],
     description: '都城防御依赖部队、工事、军械和补给协同，须兼顾城防与外围行动。',
-    benefits: '最后一季结算后，三条战线敌军均压至平定线以下，自动达成胜利。', tags: ['终局结算', '最终胜利', '三线平定'],
+    benefits: '最后一季结算后，四条战线敌军均压至平定线以下，自动达成胜利。', tags: ['终局结算', '最终胜利', '四线平定'],
     automatic: true, cost: 0, testCost: 0, prestige: 0, minimum: 0, work: 1,
     technical: '兵力数量不能代替指挥和训练，精良军械也依赖稳定补给；守军需要维持纪律、预备力量与各部通信。',
     historical: '明代军事著作已把练兵、治械和阵法联系讨论。城防长期涉及军事组织、工程设施与物资储备的共同运作。', source: SOURCES.qijiguang,
@@ -363,25 +363,24 @@ export const TECH_CATEGORIES = [
 ];
 export const SPECIALTIES = [{id:'math',name:'数学'},{id:'metallurgy',name:'冶金'},{id:'mechanics',name:'机械'},{id:'foreign',name:'洋务'},{id:'military',name:'军事'},{id:'management',name:'管理'}];
 export const DOCTRINES = [
-  {id:'cold',name:'冷兵器大军',description:'以充足的铁器、甲具和工业供给武装大军，靠持续补员与纪律维持各线战事。',branch:'infantry',quantityFactor:3.2,frontModifiers:{li:1.12,qing:1},equipmentFamily:'cold_equipment'},
-  {id:'cuirassier',name:'胸甲骑兵',description:'集中精良甲具与训练，组建冲击力强的骑兵军团。',branch:'cavalry',quantityFactor:1.45,frontModifiers:{li:1.1,qing:1.18},equipmentFamily:'cavalry'},
-  {id:'minie',name:'精锐火枪军',description:'缩小军队规模，以成套火枪弹药和严格操练提高战斗效能。',branch:'infantry',quantityFactor:1.05,frontModifiers:{li:1.15,qing:1.25},equipmentFamily:'firearms'},
-  {id:'breech',name:'后装精兵',description:'进一步集中供给与训练，适合高效后装火器，亦可暂用较早制式。',branch:'infantry',quantityFactor:.9,frontModifiers:{li:1.35,qing:1.5},equipmentFamily:'firearms'},
+  {id:'cold',name:'冷兵器大军',description:'以充足的铁器、甲具和工业供给武装大军，靠持续补员与纪律维持各线战事。',branch:'infantry',quantityFactor:3.2,frontModifiers:{bailian:.95,li:1.12,qing:1},equipmentFamily:'cold_equipment'},
+  {id:'cuirassier',name:'胸甲骑兵',description:'集中精良甲具与训练，组建冲击力强的骑兵军团。',branch:'cavalry',quantityFactor:1.45,frontModifiers:{bailian:.85,li:1.1,qing:1.18},equipmentFamily:'cavalry'},
+  {id:'minie',name:'精锐火枪军',description:'缩小军队规模，以成套火枪弹药和严格操练提高战斗效能。',branch:'infantry',quantityFactor:1.05,frontModifiers:{bailian:1.1,li:1.15,qing:1.25},equipmentFamily:'firearms'},
+  {id:'breech',name:'后装精兵',description:'进一步集中供给与训练，适合高效后装火器，亦可暂用较早制式。',branch:'infantry',quantityFactor:.9,frontModifiers:{bailian:1.15,li:1.35,qing:1.5},equipmentFamily:'firearms'},
 ];
 // Retained export for consumers that enumerate strategic choices.
 export const ROUTES = DOCTRINES;
 export const FAMILIES = [
- ['survey','矿料勘察'],['education','工匠教育'],['standards','度量标准'],['power','动力'],['casting','铸造'],['iron','炼铁'],['fuel','燃料'],['malleable','熟铁'],['steel','炼钢'],['rolling','轧制'],['machine','母机'],['quality','检验'],['precision','精密工具'],['production','生产组织'],['cold_equipment','冷兵器与甲具'],['firearms','步兵枪械'],['powder','火药供给'],['ammunition','步兵弹药'],['percussion','击发工艺'],['rifling','线膛加工'],['cavalry','骑兵装备'],['artillery','火炮'],['artillery_ammo','炮兵弹药'],['carriages','炮架'],['gun_body','炮身'],['cases','弹壳'],['breech','后装机构'],['drill','操典'],['officers','军官'],['logistics','后勤'],['repairs','维修'],['victory','守京']
+ ['survey','矿料勘察'],['education','工匠教育'],['standards','度量标准'],['power','动力'],['casting','铸造'],['iron','炼铁'],['fuel','燃料'],['malleable','熟铁'],['steel','炼钢'],['rolling','轧制'],['machine','车床与标准母机'],['boring','镗床'],['planing','刨床'],['quality','检验'],['precision','精密工具'],['production','生产组织'],['cold_equipment','冷兵器与甲具'],['firearms','步兵枪械'],['powder','火药供给'],['ammunition','步兵弹药'],['percussion','击发工艺'],['rifling','线膛加工'],['cavalry','骑兵装备'],['artillery','火炮'],['artillery_ammo','炮兵弹药'],['carriages','炮架'],['gun_body','炮身'],['cases','弹壳'],['breech','后装机构'],['drill','操典'],['officers','军官'],['logistics','后勤'],['repairs','维修'],['victory','守京']
 ].map(([id,name])=>({id,name}));
-export const MILESTONES = [
- {id:'foundations',name:'百工立基',description:'勘明原料、统一尺度，工业计划由纸面落地。',requirements:[{family:'survey',minLevel:1},{family:'standards',minLevel:1}],facilityRequirements:['workshop']},
- {id:'ironworking',name:'铁料可用',description:'任一种炼铁法验收即可开启铁器与母机；以后仍可补研更强炼铁法。',requirements:[{family:'iron',minLevel:1}],facilityRequirements:[]},
- {id:'machine_age',name:'母机入厂',description:'初代母机与军器工场结合，打开加工与规模生产。',requirements:[{family:'machine',minLevel:1}],facilityRequirements:['machine_shop']},
- {id:'precision',name:'精工成法',description:'较强母机与成品检验具备后，开展线膛、击发与精密配合。',requirements:[{family:'machine',minLevel:2},{family:'quality',minLevel:1}],facilityRequirements:['machine_shop']},
- {id:'powder_age',name:'火药成制',description:'火药定额与库务验收，让火器和弹药项目有可靠基础。',requirements:[{family:'powder',minLevel:1}],facilityRequirements:[]},
- {id:'steelworks',name:'钢料可用',description:'工具钢或规模炼钢均可打开钢制甲具与精密工具。',requirements:[{family:'steel',minLevel:1}],facilityRequirements:['furnace']},
- {id:'organization',name:'新军立制',description:'操典与固定营地齐备，开始持续练军、军官培养和军需建设。',requirements:[{family:'drill',minLevel:1}],facilityRequirements:['drill_ground']},
- {id:'rifled_arms',name:'击发线膛',description:'线膛与击发工艺汇合，可发展米尼步枪及其配套弹药。',requirements:[{family:'rifling',minLevel:1},{family:'percussion',minLevel:1}],facilityRequirements:['machine_shop']},
+// Building levels now carry the research gates; keep the export for existing consumers.
+export const MILESTONES = [];
+export const BUILDING_CATEGORIES = [
+ {id:'workshop',symbol:'ruler',name:'基础工坊',icon:'坊',description:'勘察、度量、人才与初期铁器，奠定工艺基础。'},
+ {id:'furnace',symbol:'anvil',name:'炼铁炉场',icon:'炉',description:'炼铁、熟铁与炼钢分级展开，保留材料路线选择。'},
+ {id:'machine_shop',symbol:'gear',name:'机械工场',icon:'机',description:'从独立机床与检验，推进标准母机、量产和精密加工。'},
+ {id:'arsenal',symbol:'rifle',name:'火器工场',icon:'械',description:'逐级发展枪械，并按需要扩建甲具、弹药与火炮工场。'},
+ {id:'drill_ground',symbol:'flag',name:'演武场',icon:'营',description:'培养军官、组织军需，再完善炮架运输与随军维修。'},
 ];
 const EXTRA = [
  project('bloomery','土法块炼铁','metallurgy',1,[],{description: '块炼铁在铁尚未完全熔化时得到含渣铁块，是历史悠久的直接炼铁方法。',technical: '铁块中的炉渣和孔隙需要在后续整炼中减少；材料性质容易出现差异，生产通常依赖较多熟练劳动。', historical: '块炼法在古代多地广泛使用。高炉兴起后，它仍在部分地区延续，并未在同一时期被统一替代。', source: SOURCES.archaeometallurgy,tags:['起步炼铁','小炉'],work:1}),
@@ -389,20 +388,20 @@ const EXTRA = [
  project('steel_arms','钢制刀矛与板甲','smallarms',4,[],{description: '钢制刀矛与板甲利用钢材的强度和韧性，承担近战与身体防护功能。',technical: '刃具和甲片的受力方式不同，对硬度、韧性与重量各有要求；优质材料仍须配合合理结构和可靠制作。', historical: '钢制兵器和板甲在火器普及后仍继续使用。部分护甲加厚以应对枪弹，也因此面临重量与防护范围的取舍。', source: SOURCES.armor,tags:['冷兵器','钢甲'],work:2}),
  project('cuirassier','制式胸甲骑兵装具','smallarms',4,[],{description: '胸甲骑兵以躯干护甲、骑兵刀与马具为主要装具，是欧洲重骑兵的一种形态。',technical: '胸甲把防护集中在要害部位，减轻全身护甲的负担；骑乘活动与长途行军仍受装具重量、马匹和维护条件影响。', historical: '近代胸甲骑兵长期承担骑兵任务，部分部队也使用火器。随着步兵火力增强，重骑兵的战场地位逐渐变化。', source: SOURCES.cavalry,tags:['骑兵','胸甲'],work:2}),
 ];
-// family, level, industrial capacity, equipment coefficient, milestone gates, direct prerequisites.
+// Family, equipment generation, industrial capacity, equipment coefficient.
+// Boring and planing retain independent capacity; later lathes do not replace them.
 const SPEC = {
- survey:['survey',1,0,0,[],[]],school:['education',1,4,0,[],[]],standards:['standards',1,4,0,[],[]],water_power:['power',1,8,0,[],[]],
- bloomery:['iron',1,14,0,['foundations'],[]],iron:['iron',2,27,0,['foundations'],[]],coking:['fuel',1,5,0,['foundations'],[]],coke_furnace:['iron',3,42,0,['foundations'],['coking']],hot_blast:['iron',4,58,0,['ironworking'],['coking']],
- wrought_iron:['malleable',1,6,0,['ironworking'],[]],crucible_steel:['steel',1,10,0,['ironworking'],['wrought_iron']],bessemer_steel:['steel',2,25,0,['precision'],['coking']],rolling_mill:['rolling',1,15,0,['ironworking'],['wrought_iron','water_power']],
- lathe:['machine',1,12,0,['ironworking'],[]],boring_machine:['machine',2,22,0,['machine_age'],[]],planer:['machine',3,30,0,['machine_age'],[]],standard_tools:['machine',4,45,0,['precision'],['school']],quality_control:['quality',1,10,0,['machine_age'],[]],precision_tools:['precision',1,15,0,['precision','steelworks'],[]],
- civil_works:['production',1,22,0,['ironworking'],[]],arsenal_workshops:['production',2,45,0,['machine_age'],[]],mass_production:['production',3,70,0,['precision'],['school']],
- cold_arms:['cold_equipment',1,0,1.15,['ironworking'],[]],steel_arms:['cold_equipment',2,0,1.65,['steelworks'],[]],matchlock:['firearms',1,0,1.45,['ironworking','powder_age'],[]],muskets:['firearms',2,0,1.85,['machine_age','powder_age'],[]],percussion_musket:['firearms',3,0,2.25,['precision','powder_age'],['percussion_caps']],minie_rifle:['firearms',4,0,3.2,['rifled_arms'],[]],breech_rifle:['firearms',5,0,4.2,['rifled_arms'],['breech_actions']],
- powder_supply:['powder',1,0,0,['foundations'],[]],paper_cartridges:['ammunition',1,0,0,['powder_age'],[]],minie_ammo:['ammunition',2,0,0,['rifled_arms'],['paper_cartridges']],metal_cartridges:['ammunition',3,0,0,['rifled_arms'],['cartridge_cases']],percussion_caps:['percussion',1,0,0,['precision','powder_age'],[]],rifling:['rifling',1,0,0,['precision'],[]],cartridge_cases:['cases',1,0,0,['precision','steelworks'],['rolling_mill']],breech_actions:['breech',1,0,0,['precision'],['precision_tools','percussion_caps']],
- cavalry_gun:['cavalry',1,0,1.8,['machine_age','organization','powder_age'],['paper_cartridges']],cuirassier:['cavalry',2,0,2.5,['steelworks','organization'],[]],
- bronze_foundry:['casting',1,8,0,['foundations'],[]],cannon:['artillery',1,0,1,['ironworking','powder_age'],[]],napoleon_gun:['artillery',2,0,1.8,['precision'],['bronze_foundry','gun_carriages']],armstrong_gun:['artillery',3,0,2.8,['rifled_arms'],['forged_gun_body','precision_tools']],artillery_supply:['artillery_ammo',1,0,0,['powder_age'],[]],rifled_shells:['artillery_ammo',2,0,0,['rifled_arms'],['artillery_supply']],gun_carriages:['carriages',1,0,0,['ironworking','organization'],[]],forged_gun_body:['gun_body',1,0,0,['precision','steelworks'],['rolling_mill']],
- drill_manual:['drill',1,0,0,[],['school']],officer_school:['officers',1,0,0,['organization'],['school']],logistics:['logistics',1,0,0,['organization'],[]],repair_corps:['repairs',1,0,0,['machine_age','organization'],['logistics']],joint_trials:['victory',1,0,0,[],[]],
+ survey:['survey',1,0,0],school:['education',1,4,0],standards:['standards',1,4,0],water_power:['power',1,8,0],
+ bloomery:['iron',1,14,0],iron:['iron',2,27,0],coking:['fuel',1,5,0],coke_furnace:['iron',3,42,0],hot_blast:['iron',4,58,0],
+ wrought_iron:['malleable',1,6,0],crucible_steel:['steel',1,10,0],bessemer_steel:['steel',2,25,0],rolling_mill:['rolling',1,15,0],
+ lathe:['machine',1,12,0],boring_machine:['boring',1,22,0],planer:['planing',1,30,0],standard_tools:['machine',4,45,0],quality_control:['quality',1,10,0],precision_tools:['precision',1,15,0],
+ civil_works:['production',1,22,0],arsenal_workshops:['production',2,45,0],mass_production:['production',3,70,0],
+ cold_arms:['cold_equipment',1,0,1.15],steel_arms:['cold_equipment',2,0,1.65],matchlock:['firearms',1,0,1.45],muskets:['firearms',2,0,1.85],percussion_musket:['firearms',3,0,2.25],minie_rifle:['firearms',4,0,3.2],breech_rifle:['firearms',5,0,4.2],
+ powder_supply:['powder',1,0,0],paper_cartridges:['ammunition',1,0,0],minie_ammo:['ammunition',2,0,0],metal_cartridges:['ammunition',3,0,0],percussion_caps:['percussion',1,0,0],rifling:['rifling',1,0,0],cartridge_cases:['cases',1,0,0],breech_actions:['breech',1,0,0],
+ cavalry_gun:['cavalry',1,0,1.8],cuirassier:['cavalry',2,0,2.5],
+ bronze_foundry:['casting',1,8,0],cannon:['artillery',1,0,1],napoleon_gun:['artillery',2,0,1.8],armstrong_gun:['artillery',3,0,2.8],artillery_supply:['artillery_ammo',1,0,0],rifled_shells:['artillery_ammo',2,0,0],gun_carriages:['carriages',1,0,0],forged_gun_body:['gun_body',1,0,0],
+ drill_manual:['drill',1,0,0],officer_school:['officers',1,0,0],logistics:['logistics',1,0,0],repair_corps:['repairs',1,0,0],joint_trials:['victory',1,0,0],
 };
-const FACILITY_REQUIREMENTS = {survey:['workshop'],school:['workshop'],standards:['workshop'],water_power:['workshop'],bloomery:['workshop'],drill_manual:['workshop'],iron:['furnace'],coking:['furnace'],coke_furnace:['furnace'],hot_blast:['furnace'],wrought_iron:['furnace'],crucible_steel:['furnace'],bessemer_steel:['furnace']};
 const SKILL_OVERRIDES = {
  survey:{metallurgy:2,management:2,math:1},school:{management:3,foreign:2,math:1},standards:{math:3,mechanics:1},water_power:{mechanics:2,foreign:3},
  lathe:{mechanics:3,foreign:3,math:1},coking:{metallurgy:3,foreign:2},iron:{metallurgy:3,foreign:1},
@@ -412,16 +411,103 @@ const SKILL_OVERRIDES = {
  breech_actions:{math:4,mechanics:3},cartridge_cases:{math:3,mechanics:3},metal_cartridges:{management:3,math:2,mechanics:2},
 };
 const SKILLS = {metallurgy:{metallurgy:3,math:1,management:1},machinery:{mechanics:3,math:2,management:1},smallarms:{mechanics:2,foreign:2,military:1},artillery:{metallurgy:2,mechanics:2,foreign:1},army:{military:3,management:2}};
-export const PROJECTS = [...CATALOG,...EXTRA].map(item=>{
- const [family,level,capacity,equipment,milestoneRequirements,prerequisites]=SPEC[item.id];
- const familyName=FAMILIES.find(f=>f.id===family)?.name||'铸造';
- const contribution=item.id==='repair_corps'?'军中修械队使每次训练从25提高至30，换装仍保留训练成果。':capacity?`${familyName}供军产能 +${capacity}；同类取最高，不叠加。`:equipment?`${familyName}装备效能 ${equipment.toFixed(2)}；同类取最高，枪炮需配套弹药。`:item.id==='joint_trials'?'最后一季完成战斗与补员后，三条战线敌军均不超过平定线，则达成胜利。':`${familyName}等级 ${level}；用于里程碑、配套或训练条件，同类取最高。`;
- return {...item,era:item.id==='joint_trials'?9:Math.max(0,Math.min(8,level+milestoneRequirements.length)),family,familyName,level,capacity,equipment,contribution,benefits:contribution,milestoneRequirements,prerequisites,prerequisiteAny:[],facilityRequirements:FACILITY_REQUIREMENTS[item.id]||[],specialtyRequirements:SKILL_OVERRIDES[item.id]||SKILLS[item.branch],work:item.id==='joint_trials'?1:Math.min(item.work,2),...(item.id==='joint_trials'?{tags:['三线平定','终局结算'],layoutPrerequisites:[]}:{}),transfers:Object.fromEntries(Object.entries(item.transfers||{}).filter(([id])=>id!==item.id))};
+const facility = (buildingId,level,name,cost,unlocks,conditions,description,category=buildingId) => ({
+ id:level===1?buildingId:`${buildingId}_${level}`,buildingId,level,category,name,cost,
+ icon:BUILDING_CATEGORIES.find(item=>item.id===category).icon,
+ symbol:({metal_ammo_workshop:'powder',steel_armory:'shield',bronze_artillery:'cannon',rifled_artillery:'caliper'})[buildingId]||BUILDING_CATEGORIES.find(item=>item.id===category).symbol,
+ // Ordering metadata only: a combined construction project can include this level.
+ previousId:level===1?null:level===2?buildingId:`${buildingId}_${level-1}`,
+ prerequisites:[],prerequisiteAny:[],facilityRequirements:[],milestoneRequirements:[],
+ unlocks,description,...conditions,
 });
+// The four existing level-I costs are unchanged (16k/30k/48k/28k).
+// Costs are incremental. A jump to a higher level pays for every missing level
+// and retains their technical and cross-building conditions.
+// Optional armory/artillery/ammunition extensions cost 46k–88k.
+const IRON_ALTERNATIVES = ['bloomery','iron','coke_furnace','hot_blast'];
+const STEEL_ALTERNATIVES = ['crucible_steel','bessemer_steel'];
 const FACILITY_CATALOG = [
- {id:'workshop',name:'基础工坊',icon:'坊',cost:16000,prerequisites:[],milestoneRequirements:[],description:'整备工位与试制场地，开启勘察、量具和初期工艺。'},
- {id:'furnace',name:'炼铁炉场',icon:'炉',cost:30000,prerequisites:['water_power'],milestoneRequirements:['foundations'],description:'营建山麓炉群，允许采用规模炼铁、熟铁与炼钢工艺。'},
- {id:'machine_shop',name:'军器工场',icon:'机',cost:48000,prerequisites:['lathe'],milestoneRequirements:[],description:'母机入厂后打开加工、检验与分工生产里程碑。'},
- {id:'drill_ground',name:'演武场',icon:'营',cost:28000,prerequisites:['drill_manual'],milestoneRequirements:[],description:'与操典共同构成新军立制里程碑，允许持续练兵。'},
+ facility('workshop',1,'基础工坊Ⅰ',16000,
+  ['survey','standards','school','water_power','drill_manual','bloomery','powder_supply','bronze_foundry'],{},
+  '整备工位与试制场地，开展勘察、度量、人才培养及基础材料工艺。'),
+ facility('workshop',2,'基础工坊Ⅱ',24000,['cold_arms','lathe','civil_works'],
+  {prerequisiteAny:[IRON_ALTERNATIVES]},
+  '任一种炼铁工艺验收后扩充铁器工位，研究冷兵器、初代车床与民用铁器。'),
+ facility('furnace',1,'炼铁炉场Ⅰ',30000,['iron','coking','coke_furnace','hot_blast'],
+  {facilityRequirements:['workshop'],prerequisites:['survey','standards','water_power']},
+  '依据矿料勘察、统一尺度与水力基础营建炉群，分别探索木炭与焦炭炼铁。'),
+ facility('furnace',2,'炼铁炉场Ⅱ',42000,['wrought_iron','crucible_steel','rolling_mill'],
+  {prerequisiteAny:[IRON_ALTERNATIVES]},
+  '增设精炼与轧制工位，由可用铁料推进熟铁、工具钢和型材。'),
+ facility('furnace',3,'炼铁炉场Ⅲ',64000,['bessemer_steel'],
+  {facilityRequirements:['machine_shop_2'],prerequisites:['coking']},
+  '以炼焦和二级机械工场支撑规模炼钢，可合并营建缺少的炉场等级，直接研究转炉钢，无须先走坩埚钢路线。'),
+ facility('machine_shop',1,'机械工场Ⅰ',48000,['boring_machine','planer','quality_control','arsenal_workshops'],
+  {facilityRequirements:['workshop_2'],prerequisites:['lathe']},
+  '初代车床入厂，分别建立镗削、刨削、检验与分工生产能力。'),
+ facility('machine_shop',2,'机械工场Ⅱ',64000,['standard_tools','mass_production','rifling'],
+  {prerequisites:['boring_machine','planer','quality_control','school']},
+  '镗床、刨床、材料与成品检验及工匠学堂全部齐备，扩建标准母机、稳定量产与线膛加工工位。'),
+ facility('machine_shop',3,'机械工场Ⅲ',78000,['precision_tools'],
+  {prerequisiteAny:[STEEL_ALTERNATIVES]},
+  '以坩埚钢或转炉钢配合二级机械工场，开展精密工具与配合标准研究。'),
+ facility('arsenal',1,'火器工场Ⅰ',32000,['matchlock','cannon','paper_cartridges','artillery_supply'],
+  {facilityRequirements:['workshop_2'],prerequisites:['powder_supply']},
+  '依托铁器工位和火药库务，分别试制火绳枪、守备炮及配套弹药。'),
+ facility('arsenal',2,'火器工场Ⅱ',44000,['muskets','cavalry_gun'],
+  {facilityRequirements:['machine_shop'],prerequisites:['paper_cartridges']},
+  '有纸包弹和机械加工保障后，推进燧发枪与骑兵火枪；装备研究不要求先建立军制。'),
+ facility('arsenal',3,'火器工场Ⅲ',56000,['percussion_caps','percussion_musket'],
+  {facilityRequirements:['machine_shop_2']},
+  '扩充精密点火与枪机试制工位，先验证击发药帽，再研究击发式前装枪。'),
+ facility('arsenal',4,'火器工场Ⅳ',68000,['minie_rifle','minie_ammo'],
+  {prerequisites:['rifling','percussion_caps']},
+  '线膛加工与击发药帽齐备后，分头研究米尼步枪及米尼弹药。'),
+ facility('arsenal',5,'火器工场Ⅴ',80000,['breech_actions','breech_rifle'],
+  {prerequisites:['precision_tools']},
+  '用精密工具保障后装机构验证，继而试制后装线膛步枪。'),
+ facility('metal_ammo_workshop',1,'金属弹药工场',72000,['cartridge_cases','metal_cartridges'],
+  {facilityRequirements:['arsenal_4','machine_shop_3'],prerequisites:['rolling_mill']},
+  '扩建独立弹药产线，先研究金属弹壳，再组织金属定装弹量产。','arsenal'),
+ facility('steel_armory',1,'锻钢工场',46000,['steel_arms','cuirassier'],
+  {facilityRequirements:['workshop_2'],prerequisiteAny:[STEEL_ALTERNATIVES]},
+  '选择坩埚钢或转炉钢提供钢料，分别研究钢制刀矛板甲与胸甲骑兵装具。','arsenal'),
+ facility('bronze_artillery',1,'青铜炮工场',58000,['napoleon_gun'],
+  {facilityRequirements:['arsenal','machine_shop_2'],prerequisites:['bronze_foundry','gun_carriages']},
+  '整合青铜铸造、机械加工及炮架挽运条件，专门研究拿破仑野战炮。','arsenal'),
+ facility('rifled_artillery',1,'线膛炮工场',88000,['forged_gun_body','armstrong_gun','rifled_shells'],
+  {facilityRequirements:['arsenal_4','machine_shop_3'],prerequisites:['precision_tools','rolling_mill','artillery_supply']},
+  '扩建熟铁组合炮身、后装线膛炮与配套弹药工位；炮身验证后才能研究阿姆斯特朗炮。','arsenal'),
+ facility('drill_ground',1,'演武场Ⅰ',28000,['officer_school','logistics'],
+  {facilityRequirements:['workshop'],prerequisites:['drill_manual']},
+  '有基础操典后建立固定营地，培养军官并组织军需运输。'),
+ facility('drill_ground',2,'演武场Ⅱ',42000,['gun_carriages','repair_corps'],
+  {facilityRequirements:['machine_shop'],prerequisites:['logistics']},
+  '军需与机械工场齐备后增设保障营地，研究野战炮架挽运与随军修械。'),
 ];
-export const FACILITIES=FACILITY_CATALOG.map(f=>({...f,prerequisiteAny:[],unlocks:PROJECTS.filter(p=>p.facilityRequirements.includes(f.id)||p.milestoneRequirements.some(id=>MILESTONES.find(m=>m.id===id).facilityRequirements.includes(f.id))).map(p=>p.id)}));
+const RESEARCH_GROUP = Object.fromEntries(FACILITY_CATALOG.flatMap(group=>group.unlocks.map(id=>[id,group.id])));
+// Shared prerequisites are enforced at the building entrance. Only dependencies
+// between projects in the same research group remain on an individual project.
+const GROUP_DEPENDENCIES = {
+ drill_manual:{prerequisites:['school']},
+ bloomery:{prerequisites:['survey','standards']},
+ powder_supply:{prerequisites:['survey','standards']},
+ bronze_foundry:{prerequisites:['survey','standards']},
+ coke_furnace:{prerequisites:['coking']},
+ hot_blast:{prerequisites:['coking'],prerequisiteAny:[['iron','coke_furnace']]},
+ crucible_steel:{prerequisites:['wrought_iron']},
+ rolling_mill:{prerequisites:['wrought_iron']},
+ percussion_musket:{prerequisites:['percussion_caps']},
+ breech_rifle:{prerequisites:['breech_actions']},
+ metal_cartridges:{prerequisites:['cartridge_cases']},
+ armstrong_gun:{prerequisites:['forged_gun_body']},
+};
+export const PROJECTS = [...CATALOG,...EXTRA].map(item=>{
+ const [family,level,capacity,equipment]=SPEC[item.id];
+ const familyName=FAMILIES.find(f=>f.id===family)?.name||'铸造';
+ const researchGroup=RESEARCH_GROUP[item.id]||null;
+ const {prerequisites=[],prerequisiteAny=[]}=GROUP_DEPENDENCIES[item.id]||{};
+ const contribution=item.id==='repair_corps'?'军中修械队使每次训练从25提高至30，换装仍保留训练成果。':capacity?`${familyName}供军产能 +${capacity}；同类取最高，不叠加。`:equipment?`${familyName}装备效能 ${equipment.toFixed(2)}；同类取最高，枪炮需配套弹药。`:item.id==='joint_trials'?'最后一季完成战斗与补员后，四条战线敌军均不超过平定线，则达成胜利。':`${familyName}等级 ${level}；用于工艺配套或训练条件，同类取最高。`;
+ return {...item,era:item.id==='joint_trials'?9:Math.max(0,Math.min(8,level)),family,familyName,level,capacity,equipment,contribution,benefits:contribution,researchGroup,milestoneRequirements:[],prerequisites,prerequisiteAny,facilityRequirements:researchGroup?[researchGroup]:[],specialtyRequirements:SKILL_OVERRIDES[item.id]||SKILLS[item.branch],work:item.id==='joint_trials'?1:Math.min(item.work,2),...(item.id==='joint_trials'?{tags:['四线平定','终局结算'],layoutPrerequisites:[]}:{}),transfers:Object.fromEntries(Object.entries(item.transfers||{}).filter(([id])=>id!==item.id))};
+});
+export const FACILITIES = FACILITY_CATALOG;

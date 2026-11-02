@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { PROJECTS, SPECIALTIES, MILESTONES, createGame } from '../src/game.js';
-import { technologyArt, dominantSpecialty, teamPortrait, milestoneIcons } from '../src/artwork.js';
+import { PROJECTS, SPECIALTIES, FACILITIES, BUILDING_CATEGORIES, createGame } from '../src/game.js';
+import { technologyArt, dominantSpecialty, teamPortrait } from '../src/artwork.js';
 import { teamRail, techDetails, researchBoard } from '../src/tech-tree.js';
 import { teamsPage } from '../src/campaign-ui.js';
 import { icon } from '../src/icons.js';
@@ -61,14 +61,18 @@ test('every technology has its own delivered illustration and all six portrait a
   assert.equal(new Set(hashes).size, paths.length, 'distinct technologies and specialties should not share a placeholder image');
 });
 
-test('technology cards and background knowledge use matching illustrations without replacing their text status', () => {
+test('every technology card across all five building tabs and its selected details show the matching independent illustration', () => {
   const state = createGame();
-  for (const category of ['industry', 'arms', 'army']) {
+  const illustratedCards = new Map();
+  for (const {id: category} of BUILDING_CATEGORIES) {
     const html = researchBoard(state, { techCategory: category }, { icon });
-    for (const project of PROJECTS.filter(item => !item.automatic && item.category === category)) {
+    for (const project of PROJECTS.filter(item => !item.automatic && FACILITIES.find(group => group.id === item.researchGroup)?.category === category)) {
       const card = html.match(new RegExp(`<button\\b[^>]*data-action="select-tech"[^>]*data-id="${project.id}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0];
       assert.ok(card, `${project.id} remains visible`);
-      assert.ok(card.includes(`src="${technologyArt(project.id)}"`));
+      const cardImages = [...card.matchAll(/<img\b[^>]*src="([^"]+)"[^>]*>/g)].map(match => match[1]);
+      assert.deepEqual(cardImages, [technologyArt(project.id)], `${category}: ${project.id} must show its own illustration inside its card`);
+      assert.ok(!illustratedCards.has(project.id), `${project.id} should appear in only one building tab`);
+      illustratedCards.set(project.id, cardImages[0]);
       assert.match(card, /research-card-status/, 'status has a text label as well as visual treatment');
       const details = techDetails(state, project.id, { icon });
       const background = details.match(/<section class="detail-background"[^>]*>[\s\S]*?<\/section>/)?.[0];
@@ -76,19 +80,17 @@ test('technology cards and background knowledge use matching illustrations witho
       assert.ok(background.includes(project.description), 'background remains text rather than being baked into an image');
     }
   }
+  const expectedProjects = PROJECTS.filter(project => !project.automatic).map(project => project.id).toSorted();
+  assert.equal(BUILDING_CATEGORIES.length, 5);
+  assert.deepEqual([...illustratedCards.keys()].toSorted(), expectedProjects, 'every ordinary technology has a visible illustrated card');
+  assert.equal(new Set(illustratedCards.values()).size, expectedProjects.length, 'cards must not substitute a shared generic image');
 });
 
-test('all milestone routes share a distinct semantic icon rather than a technology illustration', () => {
-  assert.deepEqual(Object.keys(milestoneIcons).toSorted(), MILESTONES.map(milestone => milestone.id).toSorted());
-  const symbols = MILESTONES.map(milestone => milestoneIcons[milestone.id]);
-  assert.equal(new Set(symbols).size, MILESTONES.length);
-  const rendered = symbols.map(symbol => icon(symbol));
-  assert.equal(new Set(rendered).size, MILESTONES.length);
-  assert.ok(rendered.every(svg => svg !== icon('unknown-symbol')), 'each milestone icon is implemented rather than using a fallback');
+test('research navigation uses the five building categories instead of the removed milestone strip', () => {
   const html = researchBoard(createGame(), {}, { icon });
-  for (const milestone of MILESTONES) {
-    const item = html.match(new RegExp(`<button\\b[^>]*data-milestone="${milestone.id}"[^>]*>[\\s\\S]*?<\\/button>`))?.[0];
-    assert.ok(item?.includes(icon(milestoneIcons[milestone.id])));
-    assert.doesNotMatch(item, /<img\b/, 'milestone art must not imply one required technology route');
+  for (const category of BUILDING_CATEGORIES) {
+    assert.ok(html.includes(`data-category="${category.id}"`));
+    assert.ok(html.includes(category.name));
   }
+  assert.doesNotMatch(html, /data-milestone=|research-milestones|select-milestone/);
 });

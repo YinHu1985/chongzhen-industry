@@ -1,44 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, performAction, getProjectInfo, getCombatRating, getTeamActivity, getFinanceInfo, PROJECTS, FACILITIES } from '../src/game.js';
+import { createGame as createGameWithEvents, performAction, getProjectInfo, getCombatRating, getTeamActivity, getFinanceInfo, PROJECTS, FACILITIES } from '../src/game.js';
 import { isValidState, parseSave } from '../src/storage.js';
-import { createWarfare } from '../src/warfare.js';
+import { FRONTS, FRONT_DEFEAT_PRIORITY, frontStartTurn, createWarfare } from '../src/warfare.js';
+import { EVENTS } from '../src/events.js';
 
 const ROOT_PROJECT = PROJECTS.find(project => !project.prerequisites.length
   && !project.prerequisiteAny?.length && !project.milestoneRequirements?.length
   && project.category !== 'army');
 
-function toLegacy(current) {
-  const state = structuredClone(current);
-  state.version = 4; delete state.enemyStrength; delete state.warfare;
-  delete state.treasury; delete state.lastSettlement;
-  state.plannedEvents = [1, 2, 3].map(stage => ({ id: `crisis_${stage}`, stage,
-    turn: Math.round(state.maxTurns * stage / 4), title: '旧军报', description: '地方请求援守。' }));
-  state.resolvedEvents = state.plannedEvents.filter(event => event.turn < state.turn).map(event => event.id);
-  return state;
-}
-function toV5(current) {
-  const state = structuredClone(current);
-  state.version = 5; delete state.treasury; delete state.lastSettlement;
-  state.enemyStrength = Math.round((current.enemyStrength - .4) / .15) + 1;
-  return state;
-}
-function legacyState(turn = 1) {
-  const state = createGame(); state.turn = turn;
-  return toLegacy(state);
-}
-
 function roundTrip(state) {
-  assert.equal(isValidState(state), true, `valid v7 state rejected at turn ${state.turn}`);
+  assert.equal(isValidState(state), true, `valid v10 state rejected at turn ${state.turn}`);
   assert.deepEqual(parseSave(JSON.stringify(state)), state);
   assert.deepEqual(parseSave(JSON.stringify({ state, savedAt: '2026-11-01T00:00:00.000Z' })), state);
   return state;
 }
 
-function act(state, action) {
-  const result = performAction(state, action);
+function acknowledgeEvent(state) {
+  if (state.pending?.kind !== 'event') return state;
+  const result = performAction(roundTrip(state), { type: 'acknowledgeEvent' });
   assert.equal(result.error, undefined, result.message);
   return roundTrip(result.state);
+}
+
+function createGame(options) { return acknowledgeEvent(createGameWithEvents(options)); }
+
+function act(state, action) {
+  const result = performAction(acknowledgeEvent(state), action);
+  assert.equal(result.error, undefined, result.message);
+  return acknowledgeEvent(roundTrip(result.state));
 }
 
 function rescueFixture(inviteCourt = false) {
@@ -53,23 +43,47 @@ function rescueFixture(inviteCourt = false) {
         if (state.projects[ROOT_PROJECT.id].completed) break;
       }
       state = performAction(state, { type: 'endTurn' }).state;
-      if (state.pending?.kind === 'event') state = performAction(state, { type: 'event', choice: 'ignore' }).state;
+      if (state.pending?.kind === 'event') state = performAction(state, { type: 'acknowledgeEvent' }).state;
     }
   }
   throw new Error('No recoverable trial found');
 }
 
-test('v7 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
+test('v10 campaigns retain named teams and doctrine without serializing derived milestones or scores', () => {
   for (const maxTurns of [24, 40, 64]) for (const doctrine of ['cold', 'cuirassier', 'minie', 'breech']) {
     let state = roundTrip(createGame({ maxTurns, seed: 12345 }));
-    assert.equal(state.version, 7);
-    assert.equal(state.teams.length, 5);
+    assert.equal(state.version, 10);
+    assert.equal(state.teams.length, 2);
     assert.equal(state.candidates.length, 3);
     assert.ok(!Object.hasOwn(state, 'routes') && !Object.hasOwn(state, 'usedTeams'));
     assert.ok(!Object.hasOwn(state, 'milestones') && !Object.hasOwn(state, 'score'));
     state = act(state, { type: 'selectDoctrine', id: doctrine });
     assert.equal(state.doctrine, doctrine);
     assert.deepEqual(getCombatRating(parseSave(JSON.stringify(state))), getCombatRating(state));
+  }
+});
+
+test('the opening pirate front and later front arrivals round-trip with their settlement reports', () => {
+  for (const maxTurns of [24, 40, 64]) {
+    let state = roundTrip(createGame({ maxTurns }));
+    assert.deepEqual(Object.keys(state.warfare.fronts), ['wokou', 'bailian', 'li', 'qing']);
+    assert.deepEqual(getCombatRating(state).fronts.map(front => front.id), ['wokou']);
+    assert.equal(state.warfare.fronts.wokou.troops, FRONTS.find(front => front.id === 'wokou').initialTroops);
+    state = act(state, { type: 'endTurn' });
+    assert.deepEqual(state.lastSettlement.battles.map(front => front.id), ['wokou']);
+    assert.deepEqual(state.lastSettlement.newFronts, []);
+    assert.equal(state.warfare.fronts.wokou.lastBattle.turn, 1);
+
+    for (const definition of FRONTS.filter(front => frontStartTurn(maxTurns, front) > 1)) {
+      state = createGame({ maxTurns });
+      state.turn = frontStartTurn(maxTurns, definition) - 1;
+      state.warfare = createWarfare(maxTurns, state.turn);
+      assert.equal(state.warfare.fronts[definition.id].troops, 0);
+      state = act(roundTrip(state), { type: 'endTurn' });
+      assert.deepEqual(state.lastSettlement.newFronts, [definition.id]);
+      assert.equal(state.warfare.fronts[definition.id].troops, definition.initialTroops);
+      assert.equal(state.warfare.fronts[definition.id].lastBattle, null);
+    }
   }
 });
 
@@ -124,6 +138,7 @@ test('existing private rescue records without a court flag remain private after 
 
 test('zero prestige and immediate red-pill endings survive reload and remain terminal', () => {
   let state = createGame();
+  for (const candidate of state.candidates.slice(0, 2)) state = act(state, { type: 'hireTeam', teamId: candidate.id });
   for (let dismissal = 0; dismissal < 2; dismissal += 1) {
     state = act(state, { type: 'dismissTeam', teamId: state.teams.at(-1).id });
   }
@@ -143,45 +158,12 @@ test('zero prestige and immediate red-pill endings survive reload and remain ter
   }
 });
 
-test('legacy pending crises migrate without spending funds or prestige or advancing time', () => {
-  const old = legacyState(6);
-  old.pending = { kind: 'event', ...old.plannedEvents[0], choices: [
-    { id: 'supply', label: '军需', description: '供军', cost: 3500, disabled: true },
-    { id: 'dispatch', label: '援军', description: '援守', cost: 2800, disabled: true, successChance: 25 },
-    { id: 'ignore', label: '暂缓', description: '待议', cost: 0, disabled: false },
-  ] };
-  const migrated = parseSave(JSON.stringify(old));
-  assert.equal(migrated.version, 7); assert.equal(migrated.turn, 6);
-  assert.equal(migrated.money, old.money); assert.equal(migrated.reputation, old.reputation);
-  assert.equal(migrated.pending, null); assert.deepEqual(migrated.plannedEvents, []);
-  assert.deepEqual(migrated.resolvedEvents, []); assert.equal(migrated.warfare.fronts.wokou.troops > 0, true);
-  assert.equal(migrated.warfare.fronts.li.troops, 0); roundTrip(migrated);
-});
-
-test('v4 research methods migrate without losing research or team progress', () => {
-  let state = act(createGame({ seed: 1 }), { type: 'build', id: 'workshop' });
-  state = act(state, { type: 'invest', id: 'standards', teamId: state.teams[0].id });
-  state = act(state, { type: 'endTurn' });
-  const oldSave = toLegacy(state);
-  for (const project of Object.values(oldSave.projects)) project.method = 'standard';
-  oldSave.projects.standards.method = 'makeshift';
-  const restored = parseSave(JSON.stringify({ state: oldSave }));
-  assert.deepEqual(restored.projects, state.projects);
-  assert.deepEqual(restored.teams.map(team => ({ ...team, activity: null })), state.teams.map(team => ({ ...team, activity: null })));
-  assert.ok(restored.teams.every(team => team.activity?.kind !== 'research'));
-  assert.ok(Object.values(restored.projects).every(project => !Object.hasOwn(project, 'method')));
-  assert.equal(getTeamActivity(restored, state.teams[0].id).kind, 'idle');
-  roundTrip(restored);
-  const badSave = structuredClone(oldSave); badSave.projects.standards.method = 'unknown';
-  assert.throws(() => parseSave(JSON.stringify(badSave)));
-});
-
 test('growing warfronts and threshold defeats reload across every campaign length', () => {
   for (const maxTurns of [24, 40, 64]) {
     let state = roundTrip(createGame({ maxTurns }));
     while (state.status === 'playing') {
       state = act(state, { type: 'endTurn' });
-      if (state.pending?.kind === 'event') state = act(state, { type: 'event', choice: 'ignore' });
+      if (state.pending?.kind === 'event') state = act(state, { type: 'acknowledgeEvent' });
     }
     assert.equal(state.status, 'lost');
     assert.equal(getCombatRating(state).ready, false);
@@ -213,7 +195,7 @@ test('missing required fields and unknown or missing project and building record
     delete state.projects[id];
     assert.equal(isValidState(state), false, `missing project ${id}`);
   }
-  for (const { id } of FACILITIES) {
+  for (const id of new Set(FACILITIES.map(item => item.buildingId))) {
     const state = structuredClone(pristine);
     delete state.facilities[id];
     assert.equal(isValidState(state), false, `missing facility ${id}`);
@@ -275,7 +257,7 @@ test('invalid numbers, project metadata, forged scores and impossible endings ar
     state => { state.status = 'lost'; },
     state => { state.status = 'won'; state.projects.joint_trials.completed = true; state.projects.joint_trials.progress = 100; },
     state => { state.resolvedEvents = ['unknown']; },
-    state => { state.plannedEvents.push({ id: 'crisis_1', turn: 6 }); },
+    state => { state.plannedEvents = [{ id: 'crisis_1', turn: 6 }]; },
     state => { state.log[0].id = state.nextLogId; },
     state => { state.log.push(structuredClone(state.log[0])); },
     state => { state.stats.spent = -1; },
@@ -302,7 +284,7 @@ test('pending decisions cannot reference unrelated projects or resurrect old eve
 });
 
 test('unsupported versions and malformed or oversized imports are rejected', () => {
-  for (const version of [1, 2, 3, 8]) {
+  for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]) {
     const state = createGame(); state.version = version;
     const before = structuredClone(state);
     assert.equal(isValidState(state), false);
@@ -392,12 +374,14 @@ test('invalid difficulty, dormant deployments, enemy bounds and malformed battle
     state => { state.enemyStrength = 1.555; }, state => { state.enemyStrength = '3'; },
     state => { state.warfare.reserve = -1; }, state => { state.warfare.reserve = Infinity; },
     state => { state.warfare.lastSettledTurn = state.turn + 1; },
-    state => { state.warfare.fronts.wokou.target = 2000; },
-    state => { state.warfare.fronts.wokou.troops = 100; },
+    state => { state.warfare.fronts.bailian.target = 2000; },
+    state => { state.warfare.fronts.bailian.troops = FRONTS.find(front => front.id === 'bailian').initialTroops; },
+    state => { state.warfare.fronts.wokou.troops = FRONTS.find(front => front.id === 'wokou').minTroops - 1; },
     state => { state.warfare.fronts.wokou.battleCap = 0; },
     state => { state.warfare.fronts.wokou.battleCap = 1.5; },
     state => { state.warfare.fronts.wokou.extra = 100; },
     state => { delete state.warfare.fronts.qing; },
+    state => { delete state.warfare.fronts.bailian; },
   ];
   for (const mutate of mutations) {
     const state = createGame(); mutate(state);
@@ -409,7 +393,7 @@ test('invalid difficulty, dormant deployments, enemy bounds and malformed battle
   for (const mutate of [
     battle => { battle.enemyLosses = battle.enemyCommitted + 1; },
     battle => { battle.playerLosses = battle.playerCommitted + 1; },
-    battle => { battle.enemyAfter += 1; }, battle => { battle.turn = 24; },
+    battle => { battle.enemyAfter += 1; }, battle => { battle.turn = 0; }, battle => { battle.turn = 24; },
     battle => { battle.reinforcements = -1; }, battle => { battle.sustainable = 'true'; },
     battle => { battle.extra = 1; }, battle => { delete battle.replacementCapacity; },
   ]) {
@@ -418,41 +402,29 @@ test('invalid difficulty, dormant deployments, enemy bounds and malformed battle
   }
 });
 
-test('legacy completed campaigns retain their original endings without reopening play', () => {
-  for (const status of ['won', 'lost']) {
-    const old = legacyState(status === 'won' ? 20 : 24);
-    old.status = status;
-    if (status === 'won') {
-      for (const project of Object.values(old.projects)) {
-        project.completed = true; project.progress = 100; project.attempts = 1;
-      }
-      old.projects.joint_trials.attempts = 0;
-      Object.keys(old.army).forEach(branch => { old.army[branch] = 100; });
+test('simultaneous threshold defeats use the shared four-front priority when reloading', () => {
+  assert.deepEqual(FRONT_DEFEAT_PRIORITY, ['li', 'qing', 'bailian', 'wokou']);
+  for (const [index, expected] of FRONT_DEFEAT_PRIORITY.entries()) {
+    let state = createGame();
+    state.turn = Math.max(...FRONTS.map(front => frontStartTurn(state.maxTurns, front)));
+    state.warfare = createWarfare(state.maxTurns, state.turn);
+    for (const definition of FRONTS) {
+      state.warfare.fronts[definition.id].troops = FRONT_DEFEAT_PRIORITY.slice(index).includes(definition.id)
+        ? definition.defeatThreshold : definition.minTroops;
     }
-    const restored = parseSave(JSON.stringify({ state: old }));
-    assert.equal(restored.status, status); assert.equal(restored.legacyEnding, status);
-    assert.deepEqual(restored.projects, old.projects); assert.deepEqual(restored.army, old.army);
-    roundTrip(restored);
-    assert.ok(performAction(restored, { type: 'endTurn' }).error);
+    state = act(roundTrip(state), { type: 'endTurn' });
+    assert.equal(state.status, 'lost');
+    assert.equal(state.defeatReason, expected);
+    for (const wrongReason of FRONT_DEFEAT_PRIORITY.filter(id => id !== expected)) {
+      const corrupted = structuredClone(state);
+      corrupted.defeatReason = wrongReason;
+      assert.equal(isValidState(corrupted), false);
+    }
   }
 });
 
-test('invalid legacy saves are rejected before migration and rescue decisions remain pending', () => {
-  const malformed = legacyState(); malformed.teams[0].specialties.math = 500;
-  assert.throws(() => parseSave(JSON.stringify(malformed)));
-  const forged = legacyState(); forged.status = 'won'; forged.projects.joint_trials.completed = true;
-  forged.projects.joint_trials.progress = 100;
-  assert.throws(() => parseSave(JSON.stringify(forged)));
-  const pending = rescueFixture(true), old = toLegacy(pending);
-  const restored = parseSave(JSON.stringify(old));
-  assert.deepEqual(restored.pending, pending.pending);
-  assert.equal(restored.rng, pending.rng); assert.equal(restored.money, pending.money);
-  assert.deepEqual(act(restored, { type: 'rescue', accept: true }).projects,
-    act(pending, { type: 'rescue', accept: true }).projects);
-});
-
 test('final victory, stalemate and each front-specific ending remain valid after reloading', () => {
-  for (const ending of ['won', 'stalemate', 'li', 'qing', 'wokou']) {
+  for (const ending of ['won', 'stalemate', ...FRONT_DEFEAT_PRIORITY]) {
     let state = createGame({ enemyStrength: .70 });
     state.turn = state.maxTurns;
     state.warfare = createWarfare(state.maxTurns, state.turn);
@@ -462,6 +434,8 @@ test('final victory, stalemate and each front-specific ending remain valid after
     }
     Object.keys(state.army).forEach(branch => { state.army[branch] = 100; });
     if (ending === 'stalemate') Object.values(state.warfare.fronts).forEach(front => { front.troops *= 2; });
+    const collapsedFront = FRONTS.find(front => front.id === ending);
+    if (collapsedFront) state.warfare.fronts[ending].troops = Math.max(collapsedFront.initialTroops, collapsedFront.victoryThreshold + 1);
     for (const [id, front] of Object.entries(state.warfare.fronts)) {
       if (ending !== id) state = act(state, { type: 'configureFront', id, target: 60000, battleCap: front.battleCap });
     }
@@ -470,11 +444,6 @@ test('final victory, stalemate and each front-specific ending remain valid after
     if (state.status === 'lost') assert.equal(state.defeatReason, ending);
     const restored = roundTrip(state);
     assert.deepEqual(restored.warfare, state.warfare);
-    const migratedV5 = parseSave(JSON.stringify(toV5(state)));
-    assert.equal(migratedV5.status, state.status); assert.equal(migratedV5.defeatReason, state.defeatReason);
-    assert.equal(migratedV5.money, state.money); assert.deepEqual(migratedV5.warfare, state.warfare);
-    assert.equal(migratedV5.lastSettlement, null); assert.deepEqual(migratedV5.treasury, { entries: [], nextId: 1 });
-    roundTrip(migratedV5);
     const corrupted = structuredClone(state);
     corrupted.status = state.status === 'stalemate' ? 'lost' : 'stalemate';
     assert.equal(isValidState(corrupted), false);
@@ -492,7 +461,7 @@ test('a pacified front below its victory line does not invalidate a saved stalem
     Object.assign(state.projects[project.id], { completed: true, progress: 100, attempts: 1 });
   }
   Object.keys(state.army).forEach(branch => { state.army[branch] = 100; });
-  for (const id of ['wokou', 'qing']) {
+  for (const id of FRONTS.filter(front => front.id !== 'li').map(front => front.id)) {
     state = act(state, { type: 'configureFront', id, target: 60000, battleCap: state.warfare.fronts[id].battleCap });
   }
   state = act(state, { type: 'endTurn' });
@@ -559,29 +528,6 @@ test('multiple trials in one quarter persist attempts beyond the season number a
   }
   assert.equal(state.treasury.entries.filter(entry => entry.category === 'trial').length, 3);
   roundTrip(state);
-  const old = toV5(state);
-  assert.throws(() => parseSave(JSON.stringify(old)), 'v5 attempts still obey the former seasonal limit');
-});
-
-test('v5 migration preserves money, progress, troop records and occupied teams without opting into recurring expenses', () => {
-  let state = act(createGame(), { type: 'build', id: 'workshop' });
-  const teamId = state.teams.find(team => team.usedTurn !== state.turn).id;
-  state = act(state, { type: 'invest', id: 'standards', teamId });
-  state = act(state, { type: 'endTurn' });
-  const old = toV5(state), restored = parseSave(JSON.stringify({ state: old }));
-  assert.equal(restored.version, 7);
-  assert.deepEqual(restored.projects, old.projects);
-  assert.deepEqual(restored.warfare, old.warfare);
-  assert.equal(restored.money, old.money); assert.equal(restored.rng, old.rng);
-  assert.equal(restored.teams.find(team => team.id === teamId).usedTurn, old.teams.find(team => team.id === teamId).usedTurn);
-  assert.equal(restored.teams.find(team => team.id === teamId).activity, null);
-  assert.deepEqual(restored.treasury, { entries: [], nextId: 1 });
-  assert.equal(restored.lastSettlement, null); assert.equal(getFinanceInfo(restored).expenses, 0);
-  const next = act(restored, { type: 'endTurn' });
-  assert.equal(next.lastSettlement.expenses, 0); assert.deepEqual(next.lastSettlement.research, []);
-  assert.ok(next.treasury.entries.every(entry => entry.turn === restored.turn));
-  const corrupt = structuredClone(old); corrupt.teams.find(team => team.id === teamId).usedTurn = 0;
-  assert.throws(() => parseSave(JSON.stringify(corrupt)));
 });
 
 test('financial histories retain immediate levy and building entries separately from settlement summaries', () => {
@@ -627,26 +573,10 @@ test('forged ledger balances and malformed settlement totals or records are reje
   }
 });
 
-test('v5 pending rescue migrates without charging or discarding the unresolved trial', () => {
-  const pending = rescueFixture(true), old = toV5(pending);
-  const restored = parseSave(JSON.stringify(old));
-  assert.deepEqual(restored.pending, pending.pending);
-  assert.equal(restored.money, pending.money); assert.equal(restored.rng, pending.rng);
-  assert.ok(restored.teams.every(team => team.activity?.kind !== 'research'));
-  assert.deepEqual(restored.treasury.entries, []);
-  for (const accept of [false, true]) {
-    const after = act(restored, { type: 'rescue', accept });
-    const expected = act(pending, { type: 'rescue', accept });
-    assert.deepEqual(after.projects, expected.projects);
-    assert.equal(after.money, expected.money); assert.equal(after.reputation, expected.reputation);
-    assert.equal(after.treasury.entries.length, accept ? 1 : 0);
-  }
-});
-
-test('v7 direct multipliers preserve fractional precision through saves and combat settlement', () => {
+test('v10 direct multipliers preserve fractional precision through saves and combat settlement', () => {
   for (const enemyStrength of [.10, .29, .70, 1, 1.15, 2.33, 9.99, 10]) {
     let state = roundTrip(createGame({ enemyStrength }));
-    assert.equal(state.version, 7); assert.equal(state.enemyStrength, enemyStrength);
+    assert.equal(state.version, 10); assert.equal(state.enemyStrength, enemyStrength);
     while (state.turn < 6) state = act(state, { type: 'endTurn' });
     state = act(state, { type: 'configureFront', id: 'wokou', target: 5000, battleCap: 2500 });
     const restored = parseSave(JSON.stringify(state));
@@ -656,10 +586,131 @@ test('v7 direct multipliers preserve fractional precision through saves and comb
   }
 });
 
-test('v7 imports reject out-of-range coefficients and precision finer than hundredths', () => {
+test('v10 imports reject out-of-range coefficients and precision finer than hundredths', () => {
   for (const enemyStrength of [0, .09, .099, .101, 1.001, 1.0000000000000002, 10.001, 11, NaN, Infinity, '1.00', true, null]) {
     const state = createGame(); state.enemyStrength = enemyStrength;
     assert.equal(isValidState(state), false, String(enemyStrength));
     assert.throws(() => parseSave(JSON.stringify(state)));
+  }
+});
+
+function openingEventFixture(eventId) {
+  for (let seed = 1; seed <= 1000; seed++) {
+    const state = createGameWithEvents({ seed });
+    if (state.events.history[0]?.eventId === eventId) return roundTrip(state);
+  }
+  throw new Error(`No opening fixture for ${eventId}`);
+}
+
+test('all opening events preserve paid rewards and acknowledgement cannot award them twice', () => {
+  for (const definition of EVENTS) {
+    const state = openingEventFixture(definition.id);
+    assert.equal(state.lastSettlement, null);
+    assert.deepEqual(state.pending, { kind: 'event', occurrenceId: 1 });
+    const restored = parseSave(JSON.stringify(state));
+    const blocked = performAction(restored, { type: 'endTurn' });
+    assert.ok(blocked.error); assert.equal(blocked.state, restored);
+    const acknowledged = performAction(restored, { type: 'acknowledgeEvent' });
+    assert.equal(acknowledged.error, undefined);
+    assert.equal(acknowledged.state.pending, null);
+    for (const key of ['money', 'reputation', 'projects', 'treasury', 'stats', 'rng', 'events']) {
+      assert.deepEqual(acknowledged.state[key], restored[key], `${definition.id}: ${key}`);
+    }
+    roundTrip(acknowledged.state);
+    const duplicate = performAction(acknowledged.state, { type: 'acknowledgeEvent' });
+    assert.ok(duplicate.error); assert.equal(duplicate.state, acknowledged.state);
+    assert.deepEqual(act(acknowledged.state, { type: 'endTurn' }), act(restored, { type: 'endTurn' }));
+    if (definition.id === 'corrupt_official') {
+      assert.equal(state.treasury.entries[0].turn, 1);
+      assert.equal(state.treasury.entries[0].category, 'event');
+      assert.equal(state.treasury.entries[0].amount, 2000);
+    }
+  }
+});
+
+test('the next-turn event keeps its money in the settled quarter and reloads before acknowledgement', () => {
+  let before = createGame({ seed: 12345 });
+  while (before.turn < 5) before = act(before, { type: 'endTurn' });
+  const result = performAction(parseSave(JSON.stringify(before)), { type: 'endTurn' });
+  assert.equal(result.error, undefined);
+  const state = roundTrip(result.state), event = state.events.history.at(-1), report = state.lastSettlement;
+  assert.equal(state.turn, 6); assert.equal(event.turn, 6); assert.equal(event.eventId, 'corrupt_official');
+  assert.equal(report.turn, 5); assert.deepEqual(report.events, [event]);
+  assert.ok(report.entries.every(entry => entry.turn === 5));
+  assert.equal(report.entries.at(-1).category, 'event');
+  assert.equal(report.entries.at(-1).amount, 2000);
+  assert.deepEqual(report.incomeItems.at(-1), { id: `event:${event.id}`, label: event.title, amount: 2000 });
+  assert.equal(report.moneyAfter, report.moneyBefore + report.netIncome);
+  assert.deepEqual(state, performAction(before, { type: 'endTurn' }).state);
+  const acknowledged = acknowledgeEvent(state);
+  assert.deepEqual(acknowledged.lastSettlement, report);
+  assert.deepEqual(acknowledged.treasury, state.treasury);
+});
+
+test('event history preserves capped research rewards after a later failed trial reduces the preparation', () => {
+  let state = createGame({ seed: 42 });
+  for (const project of PROJECTS.filter(project => !project.automatic)) state.projects[project.id].progress = 90;
+  while (state.turn < 3) state = act(state, { type: 'endTurn' });
+  const occurrence = state.events.history.at(-1), effect = occurrence.effects[0];
+  assert.equal(occurrence.eventId, 'hidden_village');
+  assert.equal(effect.amount, 10); assert.equal(effect.before, 90); assert.equal(effect.after, 100);
+  assert.equal(effect.projectId, 'repair_corps');
+  state.facilities.drill_ground = 2;
+  for (let rng = 1; ; rng++) {
+    let x = rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    if ((x >>> 0) / 4294967296 > .99) { state.rng = rng; break; }
+  }
+  state = act(state, { type: 'test', id: effect.projectId });
+  assert.ok(state.projects[effect.projectId].progress < effect.after);
+  assert.deepEqual(state.events.history.at(-1), occurrence);
+  roundTrip(state);
+});
+
+test('malformed event histories, pending references and detached money rewards are rejected', () => {
+  const village = openingEventFixture('hidden_village');
+  for (const mutate of [
+    s => { delete s.events.rng; }, s => { s.events.rng = 0; }, s => { s.events.rng = 2 ** 32; },
+    s => { s.events.lastChecked.before_turn = 0; }, s => { s.events.lastChecked.before_turn = s.turn + 1; },
+    s => { s.events.lastChecked.unknown = 1; }, s => { s.events.history[0].id = 2; },
+    s => { s.events.history[0].eventId = 'unknown'; }, s => { s.events.history[0].timing = 'after_turn'; },
+    s => { s.events.history[0].turn = 0; }, s => { s.events.history[0].title = 'forged'; },
+    s => { s.events.history[0].description = 'forged'; }, s => { s.events.history[0].effects.pop(); },
+    s => { s.events.history[0].effects.reverse(); }, s => { s.events.history[0].effects[0].amount++; },
+    s => { s.events.history[0].effects[0].projectId = 'joint_trials'; },
+    s => { s.events.history[0].effects[0].name = 'forged'; },
+    s => { s.events.history[0].effects[1].after++; },
+    s => { const copy = structuredClone(s.events.history[0]); copy.id = 2; s.events.history.push(copy); s.pending.occurrenceId = 2; },
+    s => { s.pending.occurrenceId = 0; }, s => { s.pending.occurrenceId = 2; },
+    s => { s.pending.effects = []; }, s => { s.pending = { kind: 'event', occurrenceId: '1' }; },
+  ]) {
+    const state = structuredClone(village); mutate(state);
+    assert.equal(isValidState(state), false, mutate.toString());
+    assert.throws(() => parseSave(JSON.stringify(state)));
+  }
+  const money = openingEventFixture('corrupt_official');
+  for (const mutate of [
+    s => { s.events.history[0].effects[0].amount = 4000; },
+    s => { s.events.history[0].effects[0].before++; s.events.history[0].effects[0].after++; },
+    s => { s.treasury.entries[0].category = 'grant'; },
+    s => { s.events.history = []; s.pending = null; },
+  ]) {
+    const state = structuredClone(money); mutate(state);
+    assert.equal(isValidState(state), false, mutate.toString());
+  }
+});
+
+test('seasonal event copies and income item references must match their recorded occurrence', () => {
+  let state = createGame();
+  while (state.turn < 6) state = act(state, { type: 'endTurn' });
+  for (const mutate of [
+    s => { delete s.lastSettlement.events; }, s => { s.lastSettlement.events = []; },
+    s => { s.lastSettlement.events[0].id++; }, s => { s.lastSettlement.events[0].effects[0].after++; },
+    s => { s.lastSettlement.incomeItems.at(-1).id = 'event:999'; },
+    s => { s.lastSettlement.incomeItems.at(-1).label = 'forged'; },
+    s => { s.lastSettlement.incomeItems.at(-1).amount++; },
+  ]) {
+    const corrupted = structuredClone(state); mutate(corrupted);
+    assert.equal(isValidState(corrupted), false, mutate.toString());
+    assert.throws(() => parseSave(JSON.stringify(corrupted)));
   }
 });

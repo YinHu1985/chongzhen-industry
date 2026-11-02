@@ -80,3 +80,21 @@
 .new-game-modal>p:not(.modal-eyebrow){margin-bottom:8px;line-height:1.6}
 .new-game-modal .enemy-strength-setting{margin:12px 0;line-height:1.5}
 .new-game-modal .modal-choice{padding:8px 14px;line-height:1.4;margin-bottom:8px}
+
+/* New-season rewards reuse the existing court report and its progress treatment. */
+.event-rewards{display:grid;gap:12px;margin-top:18px}
+.event-reward{padding:15px 17px;border:1px solid #ad9364;background:#c3a77922;min-width:0}
+.event-reward-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;line-height:1.8}
+.event-reward-heading>strong{font-weight:600;color:#65482e;overflow-wrap:anywhere}
+.event-reward-heading>b{font-weight:500;color:#59643b;white-space:nowrap}
+.event-reward-values{display:flex;align-items:baseline;gap:12px;margin-top:9px;color:#836744;font-variant-numeric:tabular-nums}
+.event-reward-values>strong{font:25px Georgia,var(--serif);color:#59643b}
+.event-reward-values>strong small{font:12px var(--serif)}
+.event-reward-values>i{font-style:normal}
+.event-research-values{margin-top:9px;font-size:13px;color:#795b3c;font-variant-numeric:tabular-nums}
+.event-research>small{display:block;font-size:12px;line-height:1.8;color:#785b3b}
+.modal p.event-reward-note{margin:16px 0 0;font-size:13px;color:#785b3b}
+.settlement-event-card{padding:15px;border:1px solid #b49a6b;background:#eee0bf55;margin-top:11px}
+.settlement-event-card .event-rewards{margin-top:9px}
+.settlement-event-card .event-reward{padding:11px 13px}
+@media(max-width:760px){.event-reward{padding:12px}.event-reward-heading{flex-wrap:wrap;gap:2px 10px}.event-reward-values>strong{font-size:23px}.settlement-event-card{padding:12px}}

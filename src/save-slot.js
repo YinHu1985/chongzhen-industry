@@ -1,7 +1,7 @@
 import { parseSave } from './storage.js';
 
-// Keep the original browser slot so installed v4/v5 campaigns migrate on first read.
-export const SAVE_KEY = 'chongzhen-industry.save.v4';
+// Event histories use a fresh slot; older campaigns are not migrated.
+export const SAVE_KEY = 'chongzhen-industry.save.v10';
 export const MAX_SAVE_FILE_BYTES = 2 * 1024 * 1024;
 
 // Reading the title-screen slot never creates or overwrites a campaign.

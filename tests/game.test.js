@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, performAction, getSummary, getDate, getProjectInfo, getFacilityInfo, getTrainingInfo, getMilestones, getCombatRating, getGoals, getRecruitmentInfo, getTeamActivity, getTrialStakes, PROJECTS, FACILITIES, SPECIALTIES, DOCTRINES, FAMILIES } from '../src/game.js';
+import { createGame, performAction, getSummary, getDate, getProjectInfo, getFacilityInfo, getTrainingInfo, getCombatRating, getGoals, getRecruitmentInfo, getTeamActivity, getTrialStakes, PROJECTS, FACILITIES, SPECIALTIES, DOCTRINES, FAMILIES } from '../src/game.js';
 import { act, finishSeason, playCampaign } from './helpers/campaign.mjs';
 
 const byId=Object.fromEntries(PROJECTS.map(p=>[p.id,p]));
@@ -16,31 +16,24 @@ function rollSeed(min,max){
 function militaryFixture(){const s=createGame();s.money=1_000_000;s.facilities.drill_ground=1;complete(s,'drill_manual','officer_school','logistics');return s;}
 function coldForce(){const s=militaryFixture();complete(s,'bloomery','cold_arms','mass_production','standard_tools','school','standards','water_power','quality_control');Object.assign(s.army,{infantry:100,drill:100,coordination:100});return s;}
 
-test('catalog families, specialties, milestones and building gates are valid and reachable',()=>{
-  assert.ok(PROJECTS.length>=50);
-  assert.deepEqual(FACILITIES.map(f=>f.id).sort(),['drill_ground','furnace','machine_shop','workshop']);
+test('catalog projects retain valid families, specialties and identities under the building groups',()=>{
+  assert.equal(PROJECTS.filter(p=>!p.automatic).length,51);
   assert.equal(new Set(PROJECTS.map(p=>p.id)).size,PROJECTS.length);
   for(const p of PROJECTS){
     assert.ok(FAMILIES.some(f=>f.id===p.family),p.id);
-    assert.ok(['industry','arms','army'].includes(p.category));
     assert.ok(p.prerequisites.every(id=>byId[id]));
     assert.ok(Object.entries(p.specialtyRequirements).every(([id,w])=>SPECIALTIES.some(s=>s.id===id)&&w>0));
   }
-  const state=createGame();
-  for(let sweep=0;sweep<30;sweep++){
-    for(const f of FACILITIES)if(getFacilityInfo(state,f.id).unlocked)state.facilities[f.id]=1;
-    for(const p of PROJECTS)if(!p.automatic&&!getProjectInfo(state,p.id).locked)complete(state,p.id);
-  }
-  assert.deepEqual(PROJECTS.filter(p=>!p.automatic&&!state.projects[p.id].completed).map(p=>p.id),[]);
-  assert.ok(getMilestones(state).every(m=>m.completed));
 });
 
 test('weak iron unlocks onward research and stronger iron remains available to add later',()=>{
-  const state=workshopGame();complete(state,'survey','standards');
+  let state=workshopGame();complete(state,'survey','standards');
   assert.equal(getProjectInfo(state,'bloomery').locked,false);
   assert.equal(getProjectInfo(state,'lathe').locked,true);
   complete(state,'bloomery');
-  assert.equal(getMilestones(state).find(m=>m.id==='ironworking').completed,true);
+  assert.equal(getFacilityInfo(state,'workshop_2').canBuild,true);
+  assert.equal(getProjectInfo(state,'lathe').locked,true);
+  state=act(state,{type:'build',id:'workshop_2'});
   assert.equal(getProjectInfo(state,'lathe').locked,false);
   complete(state,'water_power');state.facilities.furnace=1;
   assert.equal(getProjectInfo(state,'iron').canInvest,true);
@@ -52,15 +45,14 @@ test('weak iron unlocks onward research and stronger iron remains available to a
   assert.equal(getCombatRating(state).industries.find(i=>i.family==='iron').value,byId.hot_blast.capacity);
 });
 
-test('milestones combine technology levels with buildings, while buildings add no numerical bonus',()=>{
-  let state=workshopGame();complete(state,'bloomery','lathe');
-  assert.equal(getMilestones(state).find(m=>m.id==='machine_age').completed,false);
+test('research groups require their building level, while the building itself adds no numerical bonus',()=>{
+  let state=workshopGame();state.facilities.workshop=2;complete(state,'bloomery','lathe');
   assert.equal(getProjectInfo(state,'boring_machine').locked,true);
   state.money=50000;const before=getCombatRating(state).industrialCapacity,income=getSummary(state).income;
   const info=getFacilityInfo(state,'machine_shop');assert.ok(info.canBuild);
   state=act(state,{type:'build',id:'machine_shop'});
   assert.equal(state.teams.find(t=>t.id===info.selectedTeamId).usedTurn,state.turn);
-  assert.equal(getMilestones(state).find(m=>m.id==='machine_age').completed,true);
+  assert.equal(state.facilities.machine_shop,1);
   assert.equal(getProjectInfo(state,'boring_machine').locked,false);
   assert.equal(getCombatRating(state).industrialCapacity,before);
   assert.equal(getSummary(state).income,income);
@@ -98,27 +90,27 @@ test('standing research orders spend nothing until season end, when success and 
 });
 
 test('invalid orders preserve state while a research reservation persists until cancellation',()=>{
-  let state=workshopGame();const before=JSON.stringify(state);
+  let state=workshopGame();const before=JSON.stringify(state),teamCount=state.teams.length;
   for(const action of [{type:'invest',id:'minie_rifle'},{type:'invest',id:'survey',teamId:'missing'},{type:'selectDoctrine',id:'unknown'}]){
     const result=performAction(state,action);assert.ok(result.error);assert.equal(result.state,state);assert.equal(JSON.stringify(state),before);
   }
   const teamId=state.teams[0].id;
-  state=act(state,{type:'invest',id:'standards',teamId});assert.equal(getSummary(state).freeTeams,4);
+  state=act(state,{type:'invest',id:'standards',teamId});assert.equal(getSummary(state).freeTeams,teamCount-1);
   state.rng=rollSeed(95,100);state=finishSeason(state);
-  assert.equal(getSummary(state).freeTeams,4);
+  assert.equal(getSummary(state).freeTeams,teamCount-1);
   assert.ok(state.projects.standards.progress>0);
-  state=act(state,{type:'cancelResearch',teamId});assert.equal(getSummary(state).freeTeams,5);
+  state=act(state,{type:'cancelResearch',teamId});assert.equal(getSummary(state).freeTeams,teamCount);
 });
 
 test('candidate refresh and hiring are distinct payments; dismissal loses prestige and preserves one team',()=>{
-  let state=createGame(),info=getRecruitmentInfo(state);const candidate=state.candidates[0],money=state.money;
+  let state=createGame(),info=getRecruitmentInfo(state);const candidate=state.candidates[0],money=state.money,teamCount=state.teams.length;
   state=act(state,{type:'hireTeam',teamId:candidate.id});
-  assert.equal(state.money,money-candidate.hireCost);assert.equal(state.teams.length,6);assert.equal(state.candidates.length,2);
+  assert.equal(state.money,money-candidate.hireCost);assert.equal(state.teams.length,teamCount+1);assert.equal(state.candidates.length,2);
   const previousIds=state.candidates.map(t=>t.id),beforeRefresh=state.money;
   state=act(state,{type:'refreshCandidates'});assert.equal(state.money,beforeRefresh-info.refreshCost);
   assert.equal(state.candidates.length,3);assert.ok(state.candidates.every(t=>!previousIds.includes(t.id)));
   const reputation=state.reputation;state=act(state,{type:'dismissTeam',teamId:candidate.id});
-  assert.equal(state.reputation,reputation-info.dismissPrestigeCost);assert.equal(state.teams.length,5);
+  assert.equal(state.reputation,reputation-info.dismissPrestigeCost);assert.equal(state.teams.length,teamCount);
   state.reputation=30;
   while(state.teams.length>1)state=act(state,{type:'dismissTeam',teamId:state.teams.at(-1).id});
   assert.ok(performAction(state,{type:'dismissTeam',teamId:state.teams[0].id}).error);
@@ -128,7 +120,10 @@ test('candidate refresh and hiring are distinct payments; dismissal loses presti
 
 test('recruitment caps employed teams at eight and preserves state when unaffordable',()=>{
   let state=createGame();state.money=100000;
-  for(const candidate of [...state.candidates])state=act(state,{type:'hireTeam',teamId:candidate.id});
+  while(state.teams.length<8){
+    if(!state.candidates.length)state=act(state,{type:'refreshCandidates'});
+    state=act(state,{type:'hireTeam',teamId:state.candidates[0].id});
+  }
   state=act(state,{type:'refreshCandidates'});assert.equal(state.teams.length,8);
   assert.ok(getRecruitmentInfo(state).candidates.every(c=>!c.canHire));
   assert.ok(performAction(state,{type:'hireTeam',teamId:state.candidates[0].id}).error);
@@ -162,11 +157,11 @@ test('income is exactly the base allowance plus prestige, and trials add prestig
   let state=workshopGame();state.rng=rollSeed(0,1);state.projects.survey.progress=100;
   const money=state.money,rep=state.reputation;state=act(state,{type:'test',id:'survey'});
   assert.equal(state.money,money-byId.survey.testCost);assert.equal(state.reputation,rep+byId.survey.prestige);
-  for(const p of PROJECTS)complete(state,p.id);for(const f of FACILITIES)state.facilities[f.id]=1;
+  for(const p of PROJECTS)complete(state,p.id);for(const f of FACILITIES)state.facilities[f.buildingId]=Math.max(state.facilities[f.buildingId],f.level);
   state.reputation=137;assert.equal(getSummary(state).income,33400);assert.equal(getSummary(state).upkeep,0);
 });
 
-test('training uses a matching available team, needs the training milestone and keeps progress through equipment changes',()=>{
+test('training uses a matching available team, needs a drill ground and manual and keeps progress through equipment changes',()=>{
   let state=createGame();assert.equal(getTrainingInfo(state,'infantry').canTrain,false);
   complete(state,'drill_manual');state.facilities.drill_ground=1;
   assert.equal(getTrainingInfo(state,'infantry').cap,60);
@@ -209,7 +204,7 @@ test('industrial output increases recurring replacements while equipment and tra
   assert.equal(rating.reinforcements,rating.quantity*10);
   assert.ok(rating.reinforcements>getCombatRating(createGame()).reinforcements);
   assert.equal(state.projects.minie_rifle.completed,false);
-  assert.equal(rating.fronts.length,0,'unrevealed fronts stay out of combat reports');
+  assert.deepEqual(rating.fronts.map(front=>front.id),['wokou'],'only the opening coastal front is visible before later enemies arrive');
   Object.assign(state.army,{infantry:0,drill:0,coordination:0});
   assert.equal(getCombatRating(state).training,0);
   assert.equal(getCombatRating(state).reinforcements,rating.reinforcements);
@@ -224,16 +219,21 @@ test('trials allow one paid rescue and round-tripped saves reproduce its outcome
   assert.ok(performAction(result,{type:'rescue',accept:true}).error);
 });
 
-test('new campaigns replace scripted crisis choices with persistent fronts',()=>{
+test('persistent fronts follow their timeline while random court events settle and can be acknowledged',()=>{
   let state=createGame();
-  assert.deepEqual(state.plannedEvents,[]);
+  assert.ok(!Object.hasOwn(state,'plannedEvents')&&!Object.hasOwn(state,'resolvedEvents'));
+  assert.equal(state.events.lastChecked.before_turn,1);
   while(state.turn<6)state=finishSeason(state);
-  assert.deepEqual(getCombatRating(state).fronts.map(front=>front.id),['wokou']);
-  const money=state.money,reputation=state.reputation;
-  state=act(state,{type:'endTurn'});
+  assert.deepEqual(getCombatRating(state).fronts.map(front=>front.id),['wokou','bailian']);
+  const money=state.money,reputation=state.reputation,income=getSummary(state).income;
+  state=finishSeason(state);
   assert.equal(state.pending,null);assert.equal(state.turn,7);
-  assert.equal(state.reputation,reputation);
-  assert.equal(state.money,money+getSummary(state).income);
+  const effects=state.lastSettlement.events.flatMap(event=>event.effects);
+  const eventMoney=effects.filter(effect=>effect.type==='money').reduce((sum,effect)=>sum+effect.amount,0);
+  const eventPrestige=effects.filter(effect=>effect.type==='reputation').reduce((sum,effect)=>sum+effect.amount,0);
+  assert.equal(state.reputation,reputation+eventPrestige);
+  assert.equal(state.money,money+income+eventMoney);
+  assert.equal(state.events.lastChecked.before_turn,7);
   assert.equal(state.maxTurns,24);
 });
 

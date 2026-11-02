@@ -1,11 +1,12 @@
 /** Persistent fronts. All personnel counts are people, never abstract combat scores. */
 export const FRONTS = [
-  {id:'wokou',name:'倭寇',description:'单兵凶悍，补充较弱；人数虽少，仍会重创装备与操练不足的部队。',startFraction:.25,initialTroops:3500,minTroops:800,maxTroops:60000,defeatThreshold:22000,victoryThreshold:2000,battleCap:6000,baseReinforcements:250,growthRate:.04,power:1.8,missingArtillery:0,missingCavalry:0},
-  {id:'li',name:'流寇 · 李自成',description:'单兵较弱，兵源旺盛；缺少炮兵压阵与骑兵追剿时，更难压住人数。',startFraction:.5,initialTroops:24000,minTroops:3000,maxTroops:600000,defeatThreshold:180000,victoryThreshold:8000,battleCap:20000,baseReinforcements:1800,growthRate:.065,power:.48,missingArtillery:.15,missingCavalry:.25},
+  {id:'wokou',name:'倭寇',description:'开局即可剿灭的小股倭寇，兵力与补充规模有限，适合初期熟悉驻军、战损和工业补员。',startFraction:0,initialTroops:400,minTroops:80,maxTroops:3000,defeatThreshold:2400,victoryThreshold:200,battleCap:600,baseReinforcements:25,growthRate:.025,power:.18,missingArtillery:0,missingCavalry:0},
+  {id:'bailian',name:'白莲教',description:'教众规模较大，单兵强度较低；持续聚众补充，需要稳定驻军压制。',startFraction:.25,initialTroops:6500,minTroops:1200,maxTroops:100000,defeatThreshold:45000,victoryThreshold:3000,battleCap:5500,baseReinforcements:500,growthRate:.045,power:1.2,missingArtillery:0,missingCavalry:0},
+  {id:'li',name:'闯王军',description:'单兵较弱，兵源旺盛；缺少炮兵压阵与骑兵追剿时，更难压住人数。',startFraction:.5,initialTroops:24000,minTroops:3000,maxTroops:600000,defeatThreshold:180000,victoryThreshold:8000,battleCap:20000,baseReinforcements:1800,growthRate:.065,power:.48,missingArtillery:.15,missingCavalry:.25},
   {id:'qing',name:'清军',description:'兵强且补充充足；炮兵与骑兵配套不足，会放大敌军优势。',startFraction:.75,initialTroops:18000,minTroops:2500,maxTroops:500000,defeatThreshold:110000,victoryThreshold:6500,battleCap:18000,baseReinforcements:1400,growthRate:.045,power:1.55,missingArtillery:.35,missingCavalry:.35},
 ];
 const byId=Object.fromEntries(FRONTS.map(front=>[front.id,front]));
-const priority=['li','qing','wokou'];
+export const FRONT_DEFEAT_PRIORITY=['li','qing','bailian','wokou'];
 export const frontStartTurn=(maxTurns,front)=>Math.max(1,Math.ceil(maxTurns*front.startFraction));
 export const MIN_ENEMY_STRENGTH=.10,MAX_ENEMY_STRENGTH=10,DEFAULT_ENEMY_STRENGTH=1;
 export const isEnemyStrength=value=>typeof value==='number'&&Number.isFinite(value)&&value>=MIN_ENEMY_STRENGTH&&value<=MAX_ENEMY_STRENGTH&&value===Math.round(value*100)/100;
@@ -13,7 +14,7 @@ export function normalizeEnemyStrength(value=DEFAULT_ENEMY_STRENGTH){
   const numeric=Number(value);
   return Number.isFinite(numeric)?Math.round((Math.max(MIN_ENEMY_STRENGTH,Math.min(MAX_ENEMY_STRENGTH,numeric))+Number.EPSILON)*100)/100:DEFAULT_ENEMY_STRENGTH;
 }
-// The setting is the multiplier itself; legacy levels are converted only when loading old saves.
+// The setting is the multiplier itself, shared by all four fronts.
 export const strengthMultiplier=coefficient=>coefficient;
 export function createWarfare(maxTurns,turn=1){
   return {reserve:8000,lastSettledTurn:turn-1,fronts:Object.fromEntries(FRONTS.map(front=>[front.id,{troops:turn>=frontStartTurn(maxTurns,front)?front.initialTroops:0,assigned:0,target:0,battleCap:front.battleCap,lastBattle:null}]))};
@@ -70,7 +71,7 @@ export function configureFront(state,{id,target,battleCap}){
   if(!front||!record||!liveFronts(state).some(front=>front.id===id))return '这条战线尚未出现。';
   if(!Number.isSafeInteger(target)||target<0||target>1000000)return '驻军目标须为 0 至 1,000,000 的整数。';
   if(!Number.isSafeInteger(battleCap)||battleCap<1||battleCap>front.maxTroops)return `敌军参战上限须为 1 至 ${front.maxTroops} 的整数。`;
-  if(Object.entries(state.warfare.fronts).reduce((sum,[key,value])=>sum+(key===id?target:value.target),0)>1000000)return '三线驻军目标合计不能超过 1,000,000 人。';
+  if(Object.entries(state.warfare.fronts).reduce((sum,[key,value])=>sum+(key===id?target:value.target),0)>1000000)return '四线驻军目标合计不能超过 1,000,000 人。';
   const change=Math.min(target-record.assigned,state.warfare.reserve);
   record.assigned+=change;state.warfare.reserve-=change;record.target=target;record.battleCap=battleCap;
   return '';
@@ -99,25 +100,25 @@ export function settleWarfare(state,combat){
   return rating.fronts.map(front=>({...front,...state.warfare.fronts[front.id]}));
 }
 const ENDINGS={
-  li:{title:'煤山暮色，大明梦断。',description:'流寇战线失守，李自成部攻入京城。工业未能撑起持续作战，崇祯最终自缢煤山。'},
+  li:{title:'煤山暮色，大明梦断。',description:'闯王军战线失守，李自成部攻入京城。工业未能撑起持续作战，崇祯最终自缢煤山。'},
   qing:{title:'清军入关，山河易主。',description:'清军战线失守，关隘尽破。无法挽回的兵力与补给劣势，让清军长驱入关。'},
-  wokou:{title:'凤阳遭焚，群臣献丸。',description:'倭寇战线失守，敌军焚毁凤阳。诸臣奉上红丸，宫门合拢，工业救亡之策就此断绝。'},
+  bailian:{title:'凤阳遭焚，群臣献丸。',description:'白莲教战线失守，叛军焚毁凤阳。诸臣奉上红丸，宫门合拢，工业救亡之策就此断绝。'},
+  wokou:{title:'海疆失守，群臣献丸。',description:'倭寇战线失守，沿海州县接连遭劫，朝廷威信尽失。诸臣奉上红丸，未竟的工场与新军再无诏令。'},
   prestige:{title:'群臣进献红丸。',description:'朝廷威望跌至负数。丹匣奉至御前，群臣俯首；红丸入喉，未竟的工场与新军自此再无诏令。'},
 };
 export function evaluateCampaign(state){
   const active=liveFronts(state),record=state.warfare.fronts;
-  const overrun=priority.find(id=>record[id].troops>byId[id].defeatThreshold);
+  const overrun=FRONT_DEFEAT_PRIORITY.find(id=>record[id].troops>byId[id].defeatThreshold);
   if(overrun)return {status:'lost',reason:overrun};
   if(active.length===FRONTS.length&&active.every(front=>record[front.id].troops<=front.victoryThreshold))return {status:'won',reason:null};
   // Pacified remnants at their floor need not shrink forever to keep a front secure.
   const holding=id=>{const battle=record[id].lastBattle;return record[id].troops<=byId[id].victoryThreshold||(battle?.turn===state.turn&&battle.sustainable&&battle.enemyDeclining);};
-  if(active.length===FRONTS.length&&priority.every(holding))return {status:'stalemate',reason:null};
-  return {status:'lost',reason:priority.find(id=>!holding(id))||'li'};
+  if(active.length===FRONTS.length&&FRONT_DEFEAT_PRIORITY.every(holding))return {status:'stalemate',reason:null};
+  return {status:'lost',reason:FRONT_DEFEAT_PRIORITY.find(id=>!holding(id))||'li'};
 }
 export function campaignOutcome(state){
   const outcome=state.status==='playing'?evaluateCampaign(state):{status:state.status,reason:state.defeatReason||null};
-  if(state.legacyEnding)return {...outcome,title:outcome.status==='won'?'旧卷 · 新军守京。':ENDINGS[outcome.reason||'li'].title,description:outcome.reason==='prestige'?ENDINGS.prestige.description:'本卷按旧版守京规则完结，原有结局已保留。另启新局可体验三线持续作战。'};
-  if(outcome.status==='won')return {...outcome,title:'炉火不熄，山河再续。',description:'倭寇、流寇与清军的兵力均已压至平定线以内。新军靠持续的工业补充与作战消除了大患，大明活了下来。'};
+  if(outcome.status==='won')return {...outcome,title:'炉火不熄，山河再续。',description:'倭寇、白莲教、闯王军与清军的兵力均已压至平定线以内。新军靠持续的工业补充与作战消除了大患，大明活了下来。'};
   if(outcome.status==='stalemate')return {...outcome,title:'国祚暂续，隐患未消。',description:'已平定的战线维持受控；其余战线的战损均能由当季工业补员覆盖，敌军损失也都超过补充。大明活了下来，但敌患尚未尽除，往后的局势仍未明朗。'};
   return {...outcome,...ENDINGS[outcome.reason||'li']};
 }
